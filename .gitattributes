@@ -1,0 +1,10 @@
+# Language detection for GitHub's language bar (linguist).
+*.jsx linguist-language=JavaScript
+*.js  linguist-language=JavaScript
+*.py  linguist-language=Python
+*.rs  linguist-language=Rust
+
+# Generated files: excluded from language stats and collapsed in diffs.
+package-lock.json                                   linguist-generated=true
+soroban/Cargo.lock                                  linguist-generated=true
+soroban/contracts/*/test_snapshots/**               linguist-generated=true
