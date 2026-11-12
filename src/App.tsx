@@ -6,34 +6,30 @@ import { CorridorVisualizer } from './components/CorridorVisualizer';
 import { ProtocolDocs } from './components/ProtocolDocs';
 import { NettingCalculator } from './components/NettingCalculator';
 import { OrderReceiptModal } from './components/OrderReceiptModal';
-import { TestnetWalletModal } from './components/TestnetWalletModal';
+import { BankAccountModal } from './components/BankAccountModal';
 import { GuidedTourModal } from './components/GuidedTourModal';
-import { CORRIDORS, CANONICAL_SCENARIO_ORDERS, INITIAL_USER_WALLET, INITIAL_USER_SECRET } from './data/mockData';
-import { TransferOrder, UserWallet } from './types';
-import {
-  fetchLiveNetworkStatus,
-  loadLiveAccountDetails,
-  fundWithFriendbot,
-  submitRealTestnetPayment,
-  isValidStellarSecretKey,
-} from './services/stellarTestnet';
-import { executeTwoWayMatching, runMatchingForAllCorridors } from './utils/matchingEngine';
-import { BankingHubModal } from './components/BankingHubModal';
-import { ConvertRemainderModal } from './components/ConvertRemainderModal';
-import { BankingDashboardView } from './components/BankingDashboardView';
-import { executeRemainderConversion } from './services/bankingService';
-import { Check, Zap } from 'lucide-react';
+import { CORRIDORS } from './data/mockData';
+import { AccountView, BatchSettlementResult, TransferOrder } from './types';
+import { fetchLiveNetworkStatus } from './services/stellarTestnet';
+import { api, getAccountToken, setAccountToken, type LinkBankInput } from './services/api';
+import { Check } from 'lucide-react';
+import type { FundingKind } from './data/fundingMethods';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('send');
-  const [orders, setOrders] = useState<TransferOrder[]>(CANONICAL_SCENARIO_ORDERS);
-  const [wallet, setWallet] = useState<UserWallet>(INITIAL_USER_WALLET);
-  const [secretKey, setSecretKey] = useState<string>(INITIAL_USER_SECRET);
-  const [latestLedger, setLatestLedger] = useState<number>(48922450);
+  const [orders, setOrders] = useState<TransferOrder[]>([]);
+  // The linked bank account (simulated) with its invisible, server-held Stellar wallet.
+  const [account, setAccount] = useState<AccountView | null>(null);
+  const [accountModalOpen, setAccountModalOpen] = useState<boolean>(false);
+  const [accountModalAdding, setAccountModalAdding] = useState<boolean>(false);
+  const [accountModalKind, setAccountModalKind] = useState<FundingKind | null>(null);
+  const openAccountModal = (adding = false, kind: FundingKind | null = null) => {
+    setAccountModalAdding(adding);
+    setAccountModalKind(kind);
+    setAccountModalOpen(true);
+  };
+  const [latestLedger, setLatestLedger] = useState<number>(0);
   const [inspectingOrder, setInspectingOrder] = useState<TransferOrder | null>(null);
-  const [walletModalOpen, setWalletModalOpen] = useState<boolean>(false);
-  const [bankingModalOpen, setBankingModalOpen] = useState<boolean>(false);
-  const [convertModalOrder, setConvertModalOrder] = useState<TransferOrder | null>(null);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
   const [autoMatchEnabled, setAutoMatchEnabled] = useState<boolean>(true);
   const [tourOpen, setTourOpen] = useState<boolean>(() => {
@@ -44,96 +40,53 @@ export default function App() {
     }
   });
 
-  // Load live Stellar Testnet network status and wallet details on mount
+  // Live Stellar testnet ledger (footer / receipts)
   useEffect(() => {
     let mounted = true;
     const checkNetwork = async () => {
       try {
         const status = await fetchLiveNetworkStatus();
-        if (mounted && status.latestLedger) {
-          setLatestLedger(status.latestLedger);
-        }
-      } catch (e) {
-        // Fallback
+        if (mounted && status.latestLedger) setLatestLedger(status.latestLedger);
+      } catch {
+        // keep last value
       }
     };
-
-    const loadLiveWallet = async () => {
-      try {
-        const details = await loadLiveAccountDetails(INITIAL_USER_WALLET.publicKey, INITIAL_USER_SECRET);
-        if (mounted && details.isFunded) {
-          setWallet((prev) => ({
-            ...prev,
-            publicKey: details.publicKey,
-            shortAddress: `${details.publicKey.slice(0, 4)}...${details.publicKey.slice(-4)}`,
-            xlmBalance: details.xlmBalance,
-            usdcBalance: details.usdcBalance > 0 ? details.usdcBalance : prev.usdcBalance,
-          }));
-        }
-      } catch (e) {
-        // Fallback
-      }
-    };
-
     checkNetwork();
-    loadLiveWallet();
-    const interval = setInterval(checkNetwork, 15000); // Poll every 15s
+    const interval = setInterval(checkNetwork, 15000);
     return () => {
       mounted = false;
       clearInterval(interval);
     };
   }, []);
 
-  // Background monitor: auto-resolve remainders when matching window expires
+  const refreshAccount = async () => {
+    if (!getAccountToken()) return setAccount(null);
+    try {
+      setAccount(await api.me());
+    } catch {
+      setAccountToken(null); // token no longer valid (e.g. database reset)
+      setAccount(null);
+    }
+  };
+
+  // Orders live in the server's SQLite book; the server's worker resolves expiries
+  // (unmatched remainder -> USDC via Stellar). Poll so the UI reflects worker progress.
+  const refreshOrders = async () => {
+    try {
+      const fresh = await api.orders();
+      setOrders(fresh);
+      setInspectingOrder((cur) => (cur ? fresh.find((o) => o.id === cur.id) ?? cur : cur));
+    } catch (e) {
+      console.warn('Could not load orders from server:', e);
+    }
+  };
+
   useEffect(() => {
+    refreshAccount().then(refreshOrders);
     const timer = setInterval(() => {
-      const now = Date.now();
-      setOrders((currentOrders) => {
-        let changed = false;
-        const updated = currentOrders.map((o) => {
-          if (
-            (o.status === 'open' || o.status === 'partially_matched') &&
-            o.remainingAmount > 0 &&
-            o.deadlineTimestamp <= now
-          ) {
-            changed = true;
-            const remainder = o.remainingAmount;
-            const txHash = Array.from({ length: 64 }, () =>
-              Math.floor(Math.random() * 16).toString(16)
-            ).join('');
-
-            if (o.remainderPolicy === 'convert_to_fiat_bank') {
-              const res = executeRemainderConversion({ order: o });
-              return res.updatedOrder;
-            } else if (o.remainderPolicy === 'direct_stellar_fallback') {
-              return {
-                ...o,
-                remainingAmount: 0,
-                status: 'fallback_executed' as const,
-                fallbackTxHash: txHash,
-                notes: `${o.notes || ''} · Deadline reached: Remainder ($${remainder.toFixed(
-                  2
-                )} USDC) dispatched directly to ${o.recipientName} via Stellar Testnet.`,
-              };
-            } else {
-              return {
-                ...o,
-                remainingAmount: 0,
-                status: 'refunded' as const,
-                fallbackTxHash: txHash,
-                notes: `${o.notes || ''} · Deadline reached: Unmatched remainder ($${remainder.toFixed(
-                  2
-                )} USDC) refunded to sender wallet.`,
-              };
-            }
-          }
-          return o;
-        });
-
-        return changed ? updated : currentOrders;
-      });
+      refreshOrders();
+      refreshAccount();
     }, 3000);
-
     return () => clearInterval(timer);
   }, []);
 
@@ -142,321 +95,154 @@ export default function App() {
     setTimeout(() => setToastNotification(null), 4000);
   };
 
-  const handleFaucetUsdc = async () => {
-    showToast('Requesting Friendbot funding on Stellar Testnet...');
+  const handleLinkBank = async (input: LinkBankInput) => {
+    const res = await api.linkBank(input);
+    setAccountToken(res.token);
+    setAccount(res.account);
+    await refreshOrders();
+    showToast(`${res.account.bank.name} linked. You can send now.`);
+  };
+
+  const handleUnlink = () => {
+    setAccountToken(null);
+    setAccount(null);
+    setOrders([]);
+    showToast('Signed out of this bank account on this device.');
+  };
+
+  const handleSandboxDeposit = async (bankId: number, amount: number) => {
+    setAccount(await api.deposit(bankId, amount));
+    showToast('Sandbox funds added to that bank account.');
+  };
+
+  const handleAddBank = async (input: { bankProviderId: string; bankDetails: Record<string, string>; startingBalance: number }) => {
+    const updated = await api.addBank(input);
+    setAccount(updated);
+    showToast(`${updated.banks[updated.banks.length - 1].name} linked to your account.`);
+  };
+
+  const netted = (batches: BatchSettlementResult[]) => batches.reduce((s, b) => s + b.totalVolumeNetted, 0);
+
+  // Called when a user submits a transfer. Throws on failure so the form can show the error.
+  const handleOrderCreated = async (newOrder: TransferOrder): Promise<TransferOrder> => {
+    if (!account) {
+      openAccountModal();
+      throw new Error('Link your bank account before sending.');
+    }
+    const direct = newOrder.transferType === 'direct_instant';
+    const res = await api.placeOrder({
+      recipientName: newOrder.recipientName,
+      recipientAddress: newOrder.recipientAddress.match(/G[A-Z2-7]{55}/)?.[0] ?? newOrder.recipientAddress.trim(),
+      fromCountry: newOrder.fromCountry,
+      toCountry: newOrder.toCountry,
+      fromFlag: newOrder.fromFlag,
+      toFlag: newOrder.toFlag,
+      amount: newOrder.amount.toFixed(7),
+      deadlineMinutes: Math.max(1, newOrder.deadlineMinutes),
+      bankId: newOrder.bankId,
+      remainderBankId: newOrder.remainderBankId,
+      transferType: direct ? 'direct_instant' : 'matched_pool',
+      autoMatch: autoMatchEnabled,
+      notes: newOrder.notes,
+    });
+    setAccount(res.account);
+    await refreshOrders();
+    setInspectingOrder(res.order);
+    const v = netted(res.batches);
+    showToast(
+      direct
+        ? `Converting $${newOrder.amount.toFixed(2)} from your bank to USDC and sending it via Stellar Blockchain...`
+        : v > 0
+        ? `Matched $${v.toFixed(2)} right away (settled locally). Only the unmatched part will be sent as USDC via Stellar Blockchain.`
+        : `Order ${res.order.id} is waiting for a match. Nothing has been taken from your account yet.`
+    );
+    return res.order;
+  };
+
+  const handleOrdersChanged = (updated: TransferOrder[]) => setOrders(updated);
+
+  const withToast = async (fn: () => Promise<unknown>, okMessage?: string) => {
     try {
-      await fundWithFriendbot(wallet.publicKey);
-      const updated = await loadLiveAccountDetails(wallet.publicKey, secretKey);
-      setWallet((prev) => ({
-        ...prev,
-        xlmBalance: updated.xlmBalance,
-        usdcBalance: prev.usdcBalance + 500,
-      }));
-      showToast('Stellar Testnet Account funded via Friendbot (+10,000 XLM, +500 USDC)');
-    } catch {
-      setWallet((prev) => ({
-        ...prev,
-        usdcBalance: prev.usdcBalance + 500,
-        xlmBalance: prev.xlmBalance + 25,
-      }));
-      showToast('+500 USDC Testnet Faucet Added to Wallet');
+      await fn();
+      if (okMessage) showToast(okMessage);
+    } catch (e) {
+      showToast(`Error: ${(e as Error).message}`);
+    } finally {
+      await Promise.all([refreshOrders(), refreshAccount()]);
     }
   };
 
-  const handleUpdateWallet = (updated: {
-    publicKey: string;
-    secretKey: string;
-    usdcBalance: number;
-    xlmBalance: number;
-  }) => {
-    setSecretKey(updated.secretKey);
-    setWallet((prev) => ({
-      ...prev,
-      publicKey: updated.publicKey,
-      shortAddress: `${updated.publicKey.slice(0, 4)}...${updated.publicKey.slice(-4)}`,
-      usdcBalance: updated.usdcBalance,
-      xlmBalance: updated.xlmBalance,
-    }));
-    showToast('Stellar Testnet Account Updated');
-  };
-
-  // Called when a user submits a transfer
-  const handleOrderCreated = async (newOrder: TransferOrder) => {
-    // 1. Deduct balance from sender's wallet
-    setWallet((prev) => ({
-      ...prev,
-      usdcBalance: Math.max(0, prev.usdcBalance - newOrder.amount),
-    }));
-
-    let processedOrder = { ...newOrder };
-
-    // If direct instant transfer, submit an actual on-chain transaction
-    if (newOrder.transferType === 'direct_instant' && isValidStellarSecretKey(secretKey)) {
-      try {
-        const matchPub = newOrder.recipientAddress.match(/G[A-Z2-7]{55}/);
-        const destPub = matchPub ? matchPub[0] : (newOrder.recipientAddress.startsWith('G') ? newOrder.recipientAddress : null);
-        if (destPub) {
-          const res = await submitRealTestnetPayment({
-            senderSecret: secretKey,
-            recipientPublicKey: destPub,
-            amount: newOrder.amount.toString(),
-            memoText: `TwoWay ${newOrder.id.slice(0, 10)}`,
-          });
-          if (res.success && res.hash) {
-            processedOrder.fallbackTxHash = res.hash;
-            if (res.ledger) setLatestLedger(res.ledger);
-          }
-        }
-      } catch (err) {
-        console.warn('Real direct payment submission err:', err);
-      }
-    }
-
-    const updatedWithNew = [processedOrder, ...orders];
-
-    // 2. If it's a netting pool transfer and auto-match is enabled, run matching!
-    if (autoMatchEnabled && processedOrder.transferType !== 'direct_instant') {
-      const matchResult = executeTwoWayMatching(
-        updatedWithNew,
-        processedOrder.fromCountry,
-        processedOrder.toCountry,
-        { forceSettleRemainders: false }
-      );
-
-      setOrders(matchResult.updatedOrders);
-
-      // Inspect the updated version of our order
-      const myOrder = matchResult.updatedOrders.find((o) => o.id === processedOrder.id) || processedOrder;
-      setInspectingOrder(myOrder);
-
-      if (matchResult.settlementBatch && matchResult.settlementBatch.totalVolumeNetted > 0) {
-        showToast(
-          `🎉 Request sent & matched! $${matchResult.settlementBatch.totalVolumeNetted.toFixed(
-            2
-          )} USDC netted immediately on Soroban escrow!`
-        );
-      } else {
-        showToast(`Request sent! Order ${processedOrder.id} active in Soroban matching queue.`);
-      }
-    } else {
-      setOrders(updatedWithNew);
-      setInspectingOrder(processedOrder);
-
-      if (processedOrder.transferType === 'direct_instant') {
-        showToast(
-          `Direct transfer of $${processedOrder.amount.toFixed(2)} USDC dispatched on Stellar Testnet!`
-        );
-      } else {
-        showToast(`Request sent! Order ${processedOrder.id} placed in matching queue.`);
-      }
-    }
-  };
-
-  const handleUpdateOrders = (updatedOrders: TransferOrder[]) => {
-    setOrders(updatedOrders);
-  };
-
-  // Run matching on all active corridors on demand
-  const handleRunGlobalMatching = () => {
-    const res = runMatchingForAllCorridors(orders, { forceSettleRemainders: false });
-    setOrders(res.updatedOrders);
-    if (res.totalVolumeNetted > 0) {
+  // Run matching on all corridors with two-way volume (server-side, SQLite)
+  const handleRunGlobalMatching = () =>
+    withToast(async () => {
+      const res = await api.match();
+      setOrders(res.orders);
       showToast(
-        `⚡ Successfully matched and netted $${res.totalVolumeNetted.toFixed(
-          2
-        )} USDC across bilateral corridors on Stellar Testnet!`
+        res.totalVolumeNetted > 0
+          ? `Matched and netted $${res.totalVolumeNetted.toFixed(2)} locally across all country pairs.`
+          : 'No opposite-direction transfers to match between any countries right now.'
       );
-    } else {
-      showToast('No compatible opposing volumes found in active corridors.');
-    }
-  };
-
-  // Simulate an opposing transfer (Bob in Kenya sends 200 USDC to Canada)
-  const handleSimulateOpposingOrder = () => {
-    const bobOrder: TransferOrder = {
-      id: `ORD-BOB-${Date.now().toString().slice(-4)}`,
-      senderName: 'Bob Mwangi',
-      senderAddress: 'GDARL52WXVGX6JQPIFBPS3EA45O4VTARMQTWXHUPC5KDJSJBFKZS772C (Nairobi, Kenya)',
-      recipientName: 'Emily Watson',
-      recipientAddress: 'GBKHAYYPLGZXT7OR6DLHKUKEC6OKYHRQARLUUZH6S3YLUVCG2S5BJXAD (Vancouver, BC)',
-      fromCountry: 'Kenya',
-      toCountry: 'Canada',
-      fromFlag: '🇰🇪',
-      toFlag: '🇨🇦',
-      amount: 200.0,
-      matchedAmount: 0.0,
-      remainingAmount: 200.0,
-      status: 'open',
-      createdAt: Date.now(),
-      deadlineMinutes: 45,
-      deadlineTimestamp: Date.now() + 45 * 60 * 1000,
-      remainderPolicy: 'refund_to_sender',
-      transferType: 'matched_pool',
-      matchHistory: [],
-      escrowContractId: 'CC7X...2WAY',
-      depositTxHash: '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242',
-      notes: 'Simulated counterparty payment for Canadian hosting subscription.',
-    };
-
-    const combined = [bobOrder, ...orders];
-    const matchResult = executeTwoWayMatching(combined, 'Canada', 'Kenya', {
-      forceSettleRemainders: false,
     });
 
-    setOrders(matchResult.updatedOrders);
-
-    const bobUpdated = matchResult.updatedOrders.find((o) => o.id === bobOrder.id) || bobOrder;
-    setInspectingOrder(bobUpdated);
-
-    if (matchResult.settlementBatch && matchResult.settlementBatch.totalVolumeNetted > 0) {
-      showToast(
-        `⚡ Opposing Bob transfer ($200 Kenya → Canada) created & matched! $${matchResult.settlementBatch.totalVolumeNetted.toFixed(
-          2
-        )} USDC netted.`
+  // Demo: an anonymous counterparty order opposite your latest open order (60% of it).
+  const handleSimulateOpposingOrder = () =>
+    withToast(async () => {
+      const mine = orders.find(
+        (o) =>
+          !!account &&
+          o.senderAddress === account.wallet.publicKey &&
+          o.transferType !== 'direct_instant' &&
+          (o.status === 'open' || o.status === 'partially_matched')
       );
-    } else {
-      showToast('Simulated Bob order added to Kenya → Canada queue.');
-    }
-  };
-
-  // Immediate Send Remainder Now via Direct Stellar
-  const handleInstantSendRemainder = async (orderId: string) => {
-    const target = orders.find((o) => o.id === orderId);
-    if (!target || target.remainingAmount <= 0) return;
-
-    showToast('Submitting direct payment on Stellar Testnet...');
-    let liveTxHash = '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242';
-    const matchPub = target.recipientAddress.match(/G[A-Z2-7]{55}/);
-    const recipientPub = matchPub ? matchPub[0] : (target.recipientAddress.startsWith('G') ? target.recipientAddress : null);
-
-    if (recipientPub && isValidStellarSecretKey(secretKey)) {
-      try {
-        const res = await submitRealTestnetPayment({
-          senderSecret: secretKey,
-          recipientPublicKey: recipientPub,
-          amount: target.remainingAmount.toString(),
-          memoText: `TwoWay ${target.id.slice(0, 10)}`,
-        });
-        if (res.success && res.hash) {
-          liveTxHash = res.hash;
-          if (res.ledger) setLatestLedger(res.ledger);
-        }
-      } catch (err) {
-        console.warn('Real payment fallback to simulated hash:', err);
+      const fromCountry = mine?.toCountry ?? 'Kenya';
+      const toCountry = mine?.fromCountry ?? 'Canada';
+      const amount = mine ? Math.max(0.01, Math.round(mine.remainingAmount * 60) / 100) : 2;
+      showToast('Placing an anonymous counterparty order (first time sets up demo accounts, ~10s)...');
+      const { batches } = await api.counterpartyOrder({
+        fromCountry,
+        toCountry,
+        fromFlag: mine?.toFlag,
+        toFlag: mine?.fromFlag,
+        amount: amount.toFixed(2),
+      });
+      // Show OUR order with its new match; the counterparty stays anonymous.
+      if (mine) {
+        const fresh = await api.orders();
+        setOrders(fresh);
+        setInspectingOrder(fresh.find((o) => o.id === mine.id) ?? null);
       }
-    }
-
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id === orderId && order.remainingAmount > 0) {
-          const remainder = order.remainingAmount;
-          const updated: TransferOrder = {
-            ...order,
-            remainingAmount: 0,
-            status: 'fallback_executed',
-            fallbackTxHash: liveTxHash,
-            notes: `${order.notes || ''} · Remainder ($${remainder.toFixed(
-              2
-            )} USDC) dispatched directly via Stellar PaymentOp on Testnet (Tx: ${liveTxHash.slice(0, 10)}...).`,
-          };
-
-          if (inspectingOrder && inspectingOrder.id === orderId) {
-            setInspectingOrder(updated);
-          }
-          return updated;
-        }
-        return order;
-      })
-    );
-
-    showToast(
-      `Remainder ($${target.remainingAmount.toFixed(
-        2
-      )} USDC) dispatched directly to ${target.recipientName} on Stellar Testnet!`
-    );
-  };
-
-  // Immediate Refund Remainder to Sender Wallet
-  const handleInstantRefundRemainder = (orderId: string) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id === orderId && order.remainingAmount > 0) {
-          const remainder = order.remainingAmount;
-          const refundTx = Array.from({ length: 64 }, () =>
-            Math.floor(Math.random() * 16).toString(16)
-          ).join('');
-
-          // Refund to wallet balance
-          setWallet((w) => ({
-            ...w,
-            usdcBalance: w.usdcBalance + remainder,
-          }));
-
-          const updated: TransferOrder = {
-            ...order,
-            remainingAmount: 0,
-            status: 'refunded',
-            fallbackTxHash: refundTx,
-            notes: `${order.notes || ''} · Unmatched remainder ($${remainder.toFixed(
-              2
-            )} USDC) refunded to sender wallet on Testnet.`,
-          };
-
-          if (inspectingOrder && inspectingOrder.id === orderId) {
-            setInspectingOrder(updated);
-          }
-
-          showToast(
-            `Unmatched $${remainder.toFixed(
-              2
-            )} USDC refunded to your Stellar Testnet wallet!`
-          );
-          return updated;
-        }
-        return order;
-      })
-    );
-  };
-
-  // Fast-Forward Expiry (Test countdown trigger)
-  const handleFastForwardExpiry = (orderId: string) => {
-    const targetOrder = orders.find((o) => o.id === orderId);
-    if (!targetOrder || targetOrder.remainingAmount <= 0) return;
-
-    if (targetOrder.remainderPolicy === 'convert_to_fiat_bank') {
-      const res = executeRemainderConversion({ order: targetOrder });
-      handleRemainderConverted(res.updatedOrder);
+      const v = netted(batches);
       showToast(
-        `Remainder ($${targetOrder.remainingAmount.toFixed(
-          2
-        )} USDC) converted to bank fiat (${res.conversionSummary.fiatCurrency} ${res.conversionSummary.convertedFiat.toFixed(2)})!`
+        v > 0
+          ? `Matched $${v.toFixed(2)} with an anonymous ${fromCountry} → ${toCountry} sender (settled locally).`
+          : `Anonymous ${fromCountry} → ${toCountry} order added to the queue.`
       );
-    } else if (targetOrder.remainderPolicy === 'direct_stellar_fallback') {
-      handleInstantSendRemainder(orderId);
-    } else {
-      handleInstantRefundRemainder(orderId);
-    }
-  };
+    });
 
-  const handleOpenConvertRemainder = (order: TransferOrder) => {
-    setConvertModalOrder(order);
-  };
+  // Send the unmatched remainder now: bank -> USDC -> recipient via Stellar Blockchain.
+  const handleInstantSendRemainder = (orderId: string) =>
+    withToast(async () => {
+      showToast('Converting the unmatched amount to USDC and sending it via Stellar Blockchain...');
+      const o = await api.resolve(orderId, 'payout');
+      if (o.status === 'payout_failed') throw new Error(o.payoutError || 'Payout failed');
+      setInspectingOrder(o);
+      showToast(`$${(o.payoutAmount ?? 0).toFixed(2)} sent to ${o.recipientName} as USDC via Stellar Blockchain.`);
+    });
 
-  const handleRemainderConverted = (updatedOrder: TransferOrder) => {
-    setOrders((currentOrders) =>
-      currentOrders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
-    );
-    if (inspectingOrder && inspectingOrder.id === updatedOrder.id) {
-      setInspectingOrder(updatedOrder);
-    }
-  };
+  // Cancel the unmatched remainder: nothing is charged.
+  const handleInstantRefundRemainder = (orderId: string) =>
+    withToast(async () => {
+      const o = await api.resolve(orderId, 'release');
+      setInspectingOrder(o);
+      showToast(`Unmatched $${(o.payoutAmount ?? 0).toFixed(2)} cancelled. Nothing was taken from your account.`);
+    });
 
-  const handleUpdateWalletBalances = (newUsdc: number) => {
-    setWallet((prev) => ({
-      ...prev,
-      usdcBalance: newUsdc,
-    }));
-  };
+  // Close the matching window now; the server worker sends the remainder.
+  const handleFastForwardExpiry = (orderId: string) =>
+    withToast(async () => {
+      const o = await api.expire(orderId);
+      setInspectingOrder(o);
+    }, 'Matching window closed. Sending the unmatched amount...');
 
   const activeOrdersCount = orders.filter(
     (o) => o.status === 'open' || o.status === 'partially_matched'
@@ -476,11 +262,9 @@ export default function App() {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        wallet={wallet}
-        onFaucetUsdc={handleFaucetUsdc}
+        account={account}
         activeOrdersCount={activeOrdersCount}
-        onOpenWalletModal={() => setWalletModalOpen(true)}
-        onOpenBankingModal={() => setBankingModalOpen(true)}
+        onOpenAccountModal={() => openAccountModal()}
         latestLedger={latestLedger}
         onOpenTour={() => setTourOpen(true)}
       />
@@ -490,7 +274,8 @@ export default function App() {
         {activeTab === 'send' && (
           <SendTransferForm
             corridors={CORRIDORS}
-            wallet={wallet}
+            account={account}
+            onLinkBank={(kind) => openAccountModal(true, kind ?? null)}
             onOrderCreated={handleOrderCreated}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
           />
@@ -503,7 +288,6 @@ export default function App() {
             onSelectOrder={(order) => setInspectingOrder(order)}
             onInstantSendRemainder={handleInstantSendRemainder}
             onInstantRefundRemainder={handleInstantRefundRemainder}
-            onOpenConvertRemainder={handleOpenConvertRemainder}
             onNavigateToSend={() => setActiveTab('send')}
             onRunMatching={handleRunGlobalMatching}
             onSimulateOpposingOrder={handleSimulateOpposingOrder}
@@ -513,20 +297,12 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'banking' && (
-          <BankingDashboardView
-            wallet={wallet}
-            onUpdateWalletBalances={handleUpdateWalletBalances}
-            onShowToast={showToast}
-            onOpenConvertModal={() => setBankingModalOpen(true)}
-          />
-        )}
-
         {activeTab === 'corridors' && (
           <CorridorVisualizer
             corridors={CORRIDORS}
             orders={orders}
-            onUpdateOrders={handleUpdateOrders}
+            onOrdersChanged={handleOrdersChanged}
+            onShowToast={showToast}
             onSelectOrder={(order) => setInspectingOrder(order)}
           />
         )}
@@ -545,26 +321,7 @@ export default function App() {
         onInstantSendRemainder={handleInstantSendRemainder}
         onInstantRefundRemainder={handleInstantRefundRemainder}
         onFastForwardExpiry={handleFastForwardExpiry}
-        onOpenConvertRemainder={handleOpenConvertRemainder}
         latestLedger={latestLedger}
-      />
-
-      {/* Convert Remainder to Fiat Modal */}
-      <ConvertRemainderModal
-        order={convertModalOrder}
-        isOpen={Boolean(convertModalOrder)}
-        onClose={() => setConvertModalOrder(null)}
-        onConverted={handleRemainderConverted}
-        onShowToast={showToast}
-      />
-
-      {/* Connected Banking & On/Off-Ramp Modal */}
-      <BankingHubModal
-        isOpen={bankingModalOpen}
-        onClose={() => setBankingModalOpen(false)}
-        wallet={wallet}
-        onUpdateWalletBalances={handleUpdateWalletBalances}
-        onShowToast={showToast}
       />
 
       {/* Guided In-Page Spotlight Walkthrough */}
@@ -575,14 +332,17 @@ export default function App() {
         activeTab={activeTab}
       />
 
-      {/* Stellar Testnet Console Modal */}
-      <TestnetWalletModal
-        isOpen={walletModalOpen}
-        onClose={() => setWalletModalOpen(false)}
-        wallet={wallet}
-        secretKey={secretKey}
-        onUpdateWallet={handleUpdateWallet}
-        latestLedger={latestLedger}
+      {/* Linked bank account (simulated) + invisible Stellar wallet */}
+      <BankAccountModal
+        isOpen={accountModalOpen}
+        onClose={() => setAccountModalOpen(false)}
+        account={account}
+        onLink={handleLinkBank}
+        onUnlink={handleUnlink}
+        onSandboxDeposit={handleSandboxDeposit}
+        startAdding={accountModalAdding}
+        startKind={accountModalKind}
+        onAddBank={handleAddBank}
       />
 
       {/* Footer */}
@@ -607,28 +367,22 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             <button
-              onClick={() => setWalletModalOpen(true)}
+              onClick={() => openAccountModal()}
               className="hover:text-slate-900 dark:hover:text-white transition-colors"
             >
-              Account
-            </button>
-            <button
-              onClick={() => setActiveTab('banking')}
-              className="hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-              Bank & On-Ramp
+              Bank Account
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
               className="hover:text-slate-900 dark:hover:text-white transition-colors"
             >
-              Transfers
+              Live Orders
             </button>
             <button
               onClick={() => setActiveTab('corridors')}
               className="hover:text-slate-900 dark:hover:text-white transition-colors"
             >
-              Order Book
+              Transaction History
             </button>
             <button
               onClick={() => setActiveTab('docs')}

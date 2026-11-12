@@ -53,7 +53,7 @@ export const CORRIDORS: Corridor[] = [
       currency: 'NGN',
       anchorName: 'Cowrywise / Flutterwave Settlement',
     },
-    description: 'Tech remitter corridor meeting Lagos fintech treasury & remote worker salaries.',
+    description: 'Tech remittances between the two countries, meeting Lagos fintech treasury & remote worker salaries.',
     activeOrdersAtoB: 8,
     activeOrdersBtoA: 5,
     volumeAtoB: 5400,

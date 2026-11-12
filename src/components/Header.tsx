@@ -1,15 +1,13 @@
 import React from 'react';
-import { ArrowLeftRight, Wallet, ShieldCheck, RefreshCw, BookOpen, Building2, Play } from 'lucide-react';
-import { UserWallet } from '../types';
+import { BookOpen, Landmark, Play } from 'lucide-react';
+import { AccountView } from '../types';
 
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  wallet: UserWallet;
-  onFaucetUsdc: () => void;
+  account: AccountView | null;
   activeOrdersCount?: number;
-  onOpenWalletModal?: () => void;
-  onOpenBankingModal?: () => void;
+  onOpenAccountModal?: () => void;
   onOpenDemoModal?: () => void;
   latestLedger?: number;
   onOpenTour?: () => void;
@@ -18,20 +16,17 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
-  wallet,
-  onFaucetUsdc,
+  account,
   activeOrdersCount = 0,
-  onOpenWalletModal,
-  onOpenBankingModal,
+  onOpenAccountModal,
   onOpenDemoModal,
   latestLedger,
   onOpenTour,
 }) => {
   const navTabs = [
     { id: 'send', label: 'Send' },
-    { id: 'dashboard', label: 'Transfers', count: activeOrdersCount },
-    { id: 'banking', label: 'Bank & On-Ramp' },
-    { id: 'corridors', label: 'Order Book' },
+    { id: 'dashboard', label: 'Live Orders', count: activeOrdersCount },
+    { id: 'corridors', label: 'Transaction History' },
     { id: 'calculator', label: 'Calculator' },
     { id: 'docs', label: 'Documentation' },
   ];
@@ -104,37 +99,23 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {onOpenBankingModal && (
-              <button
-                onClick={onOpenBankingModal}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-xs text-left transition-colors"
-                title="Connected Banking System & Fiat On/Off-Ramp"
-              >
-                <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="hidden sm:inline font-medium text-slate-700 dark:text-slate-300">
-                  Bank Hub
-                </span>
-              </button>
-            )}
-
             <button
-              onClick={onOpenWalletModal}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-xs text-left transition-colors"
-              title="Open Testnet Wallet Console"
+              onClick={onOpenAccountModal}
+              className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-xs transition-colors"
+              title={account ? `${account.bank.name} · view bank account` : 'Link your bank account'}
+              aria-label="Open bank account"
             >
-              <span className="text-[11px] text-slate-400 font-medium">USDC</span>
-              <span className="font-mono-numbers font-semibold text-slate-900 dark:text-white">
-                ${wallet.usdcBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <span className="relative">
+                <Landmark className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-800 ${
+                    account ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                />
               </span>
-            </button>
-
-            <button
-              onClick={onOpenWalletModal}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
-              title="Stellar Testnet Account"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="font-mono-numbers text-[11px]">{wallet.shortAddress}</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {account ? 'Bank Account' : 'Link Bank Account'}
+              </span>
             </button>
           </div>
         </div>

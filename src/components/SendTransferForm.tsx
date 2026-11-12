@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Clock,
@@ -10,29 +10,42 @@ import {
   Smartphone,
   ShieldCheck,
 } from 'lucide-react';
-import { Corridor, RemainderPolicy, TransferOrder, UserWallet } from '../types';
+import { AccountView, Corridor, RemainderPolicy, TransferOrder } from '../types';
+import { FX_RATES } from '../services/bankingService';
 import { isValidStellarPublicKey } from '../services/stellarTestnet';
+import { MethodSelect } from './MethodSelect';
+import { SavingsComparison } from './SavingsComparison';
+import type { FundingKind } from '../data/fundingMethods';
+
+/** Testnet accounts with USDC trustlines, so the Soroban remainder payout can land (demo convenience). */
+const DEMO_RECIPIENT_BY_COUNTRY: Record<string, string> = {
+  Kenya: 'GC7MO3K6MUMXK3W3XWAN2XJYWO5RNPSTJXNTV5SZQAUENT7GWIFBZEUI',
+  Canada: 'GANIMAPEKBIP3YXIY7SZIRQ7XARNHDGTPCN5UTIBTXX64LCSFQ6DA4JO',
+};
 
 interface SendTransferFormProps {
   corridors: Corridor[];
-  wallet: UserWallet;
-  onOrderCreated: (newOrder: TransferOrder) => void;
+  /** Linked bank account; null until the user links one. */
+  account: AccountView | null;
+  /** Open the account panel to link a payment method (optionally of one kind). */
+  onLinkBank: (kind?: FundingKind) => void;
+  /** Resolves with the stored order; rejects with a user-facing error. */
+  onOrderCreated: (newOrder: TransferOrder) => Promise<TransferOrder>;
   onNavigateToDashboard: () => void;
 }
 
 export const SendTransferForm: React.FC<SendTransferFormProps> = ({
   corridors,
-  wallet,
+  account,
+  onLinkBank,
   onOrderCreated,
   onNavigateToDashboard,
 }) => {
   const [selectedCorridorId, setSelectedCorridorId] = useState<string>('CA-KE');
   const [directionReversed, setDirectionReversed] = useState<boolean>(false);
-  const [amount, setAmount] = useState<string>('500');
-  const [recipientName, setRecipientName] = useState<string>('David Kilonzo');
-  const [recipientAddress, setRecipientAddress] = useState<string>(
-    'GAHVEV3PTFCTWHX2DTZZU3F5ZQXBKJUBA4PORGCUIFUJV2RCQAMAQ363'
-  );
+  const [amount, setAmount] = useState<string>('10');
+  const [recipientName, setRecipientName] = useState<string>('');
+  const [recipientAddress, setRecipientAddress] = useState<string>('');
 
   // Mode: Matched corridor pool vs instant direct
   const [transferMode, setTransferMode] = useState<'matched_pool' | 'direct_instant'>('matched_pool');
@@ -42,9 +55,12 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
   const [isCustomDeadline, setIsCustomDeadline] = useState<boolean>(false);
   const [customMinutesInput, setCustomMinutesInput] = useState<string>('45');
 
-  // Remainder Policy
-  const [remainderPolicy, setRemainderPolicy] =
-    useState<RemainderPolicy>('direct_stellar_fallback');
+  // Unmatched remainder always settles in USDC on Soroban.
+  const remainderPolicy: RemainderPolicy = 'direct_stellar_fallback';
+
+  // Linked bank that pays the matched part, and (optionally) a different one for the unmatched part.
+  const [bankId, setBankId] = useState<number | null>(null);
+  const [remainderBankId, setRemainderBankId] = useState<number | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittedOrder, setSubmittedOrder] = useState<TransferOrder | null>(null);
@@ -56,6 +72,30 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
 
   const fromCountry = directionReversed ? activeCorridor.countryB : activeCorridor.countryA;
   const toCountry = directionReversed ? activeCorridor.countryA : activeCorridor.countryB;
+
+  // Amount is entered in USD; the bank is charged in the sender's local currency.
+  const fxRate = FX_RATES[fromCountry.currency]?.rate ?? 1;
+  const localNeeded = (parseFloat(amount) || 0) * fxRate;
+
+  // Send from the linked bank's country when the corridor includes it.
+  useEffect(() => {
+    if (!account) return;
+    if (activeCorridor.countryA.name === account.country) setDirectionReversed(false);
+    else if (activeCorridor.countryB.name === account.country) setDirectionReversed(true);
+  }, [account?.country, selectedCorridorId]);
+
+  // Both dropdowns default to the first linked method (and re-pick if a selection disappears).
+  useEffect(() => {
+    if (!account) return;
+    const first = account.banks[0]?.id ?? null;
+    if (!account.banks.some((b) => b.id === bankId)) setBankId(first);
+    if (!account.banks.some((b) => b.id === remainderBankId)) setRemainderBankId(first);
+  }, [account?.banks.map((b) => b.id).join(',')]);
+
+  /** Pays the matched part. */
+  const payBank = account?.banks.find((b) => b.id === bankId);
+  /** "Send from": funds the unmatched part (converted to USDC), or everything for a Full Crypto Transfer. */
+  const remainderBank = account?.banks.find((b) => b.id === remainderBankId);
 
   const parsedAmount = parseFloat(amount) || 0;
   const effectiveMinutes =
@@ -73,12 +113,21 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
 
   const estimatedSavings = (parsedAmount * (activeCorridor.offRampSavingsPct / 100)).toFixed(2);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (parsedAmount <= 0) return;
-    if (parsedAmount > wallet.usdcBalance) {
-      setFormError('Amount exceeds your current testnet USDC balance.');
+    if (!account) {
+      onLinkBank();
+      setFormError('Link your bank account first.');
+      return;
+    }
+    if (fromCountry.name !== account.country) {
+      setFormError(`Your linked bank is in ${account.country}. Choose countries that send from ${account.country}.`);
+      return;
+    }
+    if (localNeeded > account.available + 0.005) {
+      setFormError(`Not enough in your bank: ${account.currency} ${account.available.toFixed(2)} available, ${account.currency} ${localNeeded.toFixed(2)} needed.`);
       return;
     }
 
@@ -88,14 +137,25 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
       return;
     }
 
+    if (!remainderBank || (transferMode === 'matched_pool' && !payBank)) {
+      setFormError('Choose which linked account to send from, or link one first.');
+      return;
+    }
+    for (const b of new Set(transferMode === 'matched_pool' ? [payBank, remainderBank] : [remainderBank])) {
+      if (b && localNeeded > b.available + 0.005) {
+        setFormError(`Not enough in ${b.name}: ${account.currency} ${b.available.toFixed(2)} available, ${account.currency} ${localNeeded.toFixed(2)} needed.`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    {
       const isInstant = transferMode === 'direct_instant';
       const newOrder: TransferOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
         senderName: 'You',
-        senderAddress: wallet.publicKey,
+        senderAddress: account.wallet.publicKey,
         recipientName: recipientName.trim() || 'Recipient',
         recipientAddress: cleanRecipient,
         fromCountry: fromCountry.name,
@@ -111,35 +171,31 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
         deadlineTimestamp: isInstant ? Date.now() : Date.now() + effectiveMinutes * 60 * 1000,
         remainderPolicy,
         transferType: transferMode,
-        matchHistory: isInstant
-          ? [
-              {
-                matchedWithOrderId: 'DIRECT-L1',
-                matchedWithSender: 'Direct Stellar Transfer',
-                amount: parsedAmount,
-                timestamp: Date.now(),
-                recipientSettled: recipientName,
-                txHash: Array.from({ length: 64 }, () =>
-                  Math.floor(Math.random() * 16).toString(16)
-                ).join(''),
-              },
-            ]
-          : [],
-        escrowContractId: isInstant ? 'NATIVE-STELLAR-PAYMENT' : 'CC7X...2WAY',
-        depositTxHash: '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242',
+        bankId: isInstant ? remainderBank?.id : payBank?.id,
+        remainderBankId: remainderBank?.id,
+        matchHistory: [],
+        escrowContractId: '',
+        depositTxHash: '',
         notes: isInstant
           ? `Direct transfer to ${toCountry.name}`
-          : `Corridor transfer ${fromCountry.name} to ${toCountry.name} (${effectiveMinutes}m window)`,
+          : `Transfer ${fromCountry.name} to ${toCountry.name} (${effectiveMinutes}m window)`,
       };
 
-      onOrderCreated(newOrder);
-      setSubmittedOrder(newOrder);
+      let saved: TransferOrder;
+      try {
+        saved = await onOrderCreated(newOrder);
+      } catch (err) {
+        setFormError((err as Error).message || 'Could not place the order.');
+        setIsSubmitting(false);
+        return;
+      }
+      setSubmittedOrder(saved);
       setIsSubmitting(false);
-      // Auto-redirect to Transfers dashboard as requested
+      // Auto-redirect to Live Orders as requested
       setTimeout(() => {
         onNavigateToDashboard();
       }, 400);
-    }, 600);
+    }
   };
 
   return (
@@ -172,7 +228,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
               onClick={onNavigateToDashboard}
               className="text-slate-900 dark:text-white font-semibold underline hover:no-underline ml-4"
             >
-              View in Transfers
+              View in Live Orders
             </button>
           </div>
         </div>
@@ -191,7 +247,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            Corridor Netting (Save ~{activeCorridor.offRampSavingsPct}%)
+            Transfer Matching (Timed)
           </button>
           <button
             type="button"
@@ -202,7 +258,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            Direct Stellar (Immediate)
+            Full Crypto Transfer (Immediate)
           </button>
         </div>
 
@@ -211,7 +267,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
           {/* Corridor Selection */}
           <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-700">
             <div>
-              <span className="text-[11px] text-slate-500 block">Corridor</span>
+              <span className="text-[11px] text-slate-500 block">Countries</span>
               <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
                 <span>{fromCountry.flag} {fromCountry.name}</span>
                 <span className="text-slate-400">→</span>
@@ -236,7 +292,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                 type="button"
                 onClick={() => setDirectionReversed(!directionReversed)}
                 className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                title="Reverse corridor direction"
+                title="Swap sending and receiving country"
               >
                 Reverse
               </button>
@@ -248,7 +304,18 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
             <div className="flex justify-between items-baseline mb-1">
               <label className="text-[11px] font-medium text-slate-500">You send</label>
               <span className="text-[11px] text-slate-400">
-                Balance: <strong className="font-mono-numbers text-slate-700 dark:text-slate-300">${wallet.usdcBalance.toFixed(2)}</strong> USDC
+                {account ? (
+                  <>
+                    Available{payBank ? ` in ${payBank.name}` : ''}:{' '}
+                    <strong className="font-mono-numbers text-slate-700 dark:text-slate-300">
+                      {account.currency} {(payBank?.available ?? account.available).toFixed(2)}
+                    </strong>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => onLinkBank()} className="underline">
+                    Link a payment method
+                  </button>
+                )}
               </span>
             </div>
 
@@ -264,8 +331,28 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                 required
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
-                USDC
+                USD
               </span>
+            </div>
+            {fromCountry.currency !== 'USD' && localNeeded > 0 && (
+              <span className="text-[11px] text-slate-500 block mt-1 font-mono-numbers">
+                ≈ {fromCountry.currency} {localNeeded.toFixed(2)} from your account
+              </span>
+            )}
+
+            <div className="mt-3">
+              <MethodSelect
+                label="Send from"
+                account={account}
+                value={remainderBank?.id ?? null}
+                onChange={setRemainderBankId}
+                onLinkAnother={() => onLinkBank()}
+                hint={
+                  transferMode === 'matched_pool'
+                    ? 'Only the unmatched part is taken from here, converted to USDC when your window closes.'
+                    : 'The whole amount is taken from here and sent as USDC via Stellar Blockchain.'
+                }
+              />
             </div>
 
             {/* Quick preset buttons */}
@@ -291,30 +378,14 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
             <span className="font-semibold text-slate-900 dark:text-white">
               Recipient in {toCountry.name}
             </span>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400">
-              <span>Sample:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setRecipientName('David Kilonzo');
-                  setRecipientAddress('GAHVEV3PTFCTWHX2DTZZU3F5ZQXBKJUBA4PORGCUIFUJV2RCQAMAQ363');
-                }}
-                className="text-slate-600 dark:text-slate-400 hover:underline"
-              >
-                David (KE)
-              </button>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setRecipientName('Emily Watson');
-                  setRecipientAddress('GBKHAYYPLGZXT7OR6DLHKUKEC6OKYHRQARLUUZH6S3YLUVCG2S5BJXAD');
-                }}
-                className="text-slate-600 dark:text-slate-400 hover:underline"
-              >
-                Emily (CA)
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setRecipientAddress(DEMO_RECIPIENT_BY_COUNTRY[toCountry.name] ?? DEMO_RECIPIENT_BY_COUNTRY.Kenya)}
+              className="text-[11px] text-slate-500 hover:underline"
+              title="Fill a testnet address that holds a USDC trustline"
+            >
+              Use testnet demo address
+            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -412,119 +483,39 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
               </div>
             )}
 
-            {/* Remainder preference: What to do with the Rest of the Money */}
-            <div data-tour="remainder-policy" className="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2.5">
-              <div className="flex justify-between items-baseline">
-                <span className="font-semibold text-slate-900 dark:text-white block text-xs">
-                  What to do with the Rest of the Money if unmatched?
+            {/* Unmatched remainder: always USDC via Soroban */}
+            <div data-tour="remainder-policy" className="pt-3 border-t border-slate-100 dark:border-slate-700">
+              <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20">
+                <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  Unmatched amount: USDC via Stellar Blockchain
                 </span>
-                <span className="text-[10px] text-slate-400">Automatic fallback rule</span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                {/* Option 1: Send the Rest via USDC */}
-                <div
-                  onClick={() => setRemainderPolicy('direct_stellar_fallback')}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    remainderPolicy === 'direct_stellar_fallback'
-                      ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-2xs'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <input
-                      type="radio"
-                      name="remainderPolicy"
-                      checked={remainderPolicy === 'direct_stellar_fallback'}
-                      onChange={() => setRemainderPolicy('direct_stellar_fallback')}
-                      className="mt-0.5 text-emerald-600 focus:ring-0"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                          <SendHorizontal className="w-3.5 h-3.5 text-emerald-500" />
-                          Send the Rest via Direct Stellar USDC
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-semibold">
-                          Guaranteed Delivery
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        If counterparty demand doesn't match 100%, immediately dispatch the rest directly to {recipientName} on Stellar. Recipient receives full funds.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Option 2: Refund the Rest to Wallet */}
-                <div
-                  onClick={() => setRemainderPolicy('refund_to_sender')}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    remainderPolicy === 'refund_to_sender'
-                      ? 'border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 shadow-2xs'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <input
-                      type="radio"
-                      name="remainderPolicy"
-                      checked={remainderPolicy === 'refund_to_sender'}
-                      onChange={() => setRemainderPolicy('refund_to_sender')}
-                      className="mt-0.5 text-indigo-600 focus:ring-0"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                          <RotateCcw className="w-3.5 h-3.5 text-indigo-500" />
-                          Refund the Rest to My Wallet
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-semibold">
-                          Zero Risk
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Only execute what matched. If unmatched when the timer closes, unlock and return the remaining USDC back to your wallet.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Option 3: Convert Rest to Bank / Mobile Money */}
-                <div
-                  onClick={() => setRemainderPolicy('convert_to_fiat_bank')}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    remainderPolicy === 'convert_to_fiat_bank'
-                      ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 shadow-2xs'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <input
-                      type="radio"
-                      name="remainderPolicy"
-                      checked={remainderPolicy === 'convert_to_fiat_bank'}
-                      onChange={() => setRemainderPolicy('convert_to_fiat_bank')}
-                      className="mt-0.5 text-amber-600 focus:ring-0"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                          Convert Rest to Recipient's Bank / M-Pesa ({toCountry.currency})
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-semibold">
-                          SEP-31 Anchor
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Automatically convert the remaining USDC at live Anchor rates and deposit directly into recipient's domestic checking account or mobile money.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Whatever isn&apos;t matched when the window closes is converted to USDC and sent to{' '}
+                  {recipientName || 'the recipient'}&apos;s Stellar wallet by the TwoWay settlement contract. Nothing is
+                  taken from your account until then.
+                </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* How the matched part is paid (matching mode only) */}
+        {transferMode === 'matched_pool' && (
+          <div data-tour="payout-method" className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-white dark:bg-slate-800/60 text-xs">
+            <MethodSelect
+              label="Pay for the matched amount with"
+              account={account}
+              value={payBank?.id ?? null}
+              onChange={setBankId}
+              onLinkAnother={() => onLinkBank()}
+              hint={`The part that matches is paid domestically in ${fromCountry.currency}, only once it matches. The recipient collects it however they prefer.`}
+            />
+            {payBank && account?.country === fromCountry.name && (
+              <div className="mt-3">
+                <SavingsComparison from={fromCountry} to={toCountry} localAmount={localNeeded} method={payBank} />
+              </div>
+            )}
           </div>
         )}
 
@@ -565,7 +556,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
           ) : transferMode === 'direct_instant' ? (
             `Send $${parsedAmount.toFixed(2)} USDC Instantly`
           ) : (
-            `Place $${parsedAmount.toFixed(2)} USDC in Matching Queue`
+            `Sign pre-authorization & place $${parsedAmount.toFixed(2)} USDC in matching queue`
           )}
         </button>
       </form>

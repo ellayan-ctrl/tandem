@@ -24,7 +24,6 @@ interface TransactionDashboardProps {
   onSelectOrder: (order: TransferOrder) => void;
   onInstantSendRemainder: (orderId: string) => void;
   onInstantRefundRemainder: (orderId: string) => void;
-  onOpenConvertRemainder?: (order: TransferOrder) => void;
   onNavigateToSend: () => void;
   onRunMatching?: () => void;
   onSimulateOpposingOrder?: () => void;
@@ -40,7 +39,6 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
   onSelectOrder,
   onInstantSendRemainder,
   onInstantRefundRemainder,
-  onOpenConvertRemainder,
   onNavigateToSend,
   onRunMatching,
   onSimulateOpposingOrder,
@@ -51,7 +49,8 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedCorridor, setSelectedCorridor] = useState<string>('all');
+  /** Country-pair filter: 'all' or "CountryA|CountryB" (both directions shown). */
+  const [selectedPair, setSelectedPair] = useState<string>('all');
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
   const [showExplainer, setShowExplainer] = useState<boolean>(true);
 
@@ -70,6 +69,42 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
   // Real-time calculation of immediate netting demand
   const { totalMatchable, corridorBreakdown } = calculateTotalMatchableVolume(orders);
 
+  // Every country pair we know about (configured pairs + any pair with orders), both directions combined.
+  const pairKey = (x: string, y: string) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+  const flagOf: Record<string, string> = {};
+  corridors.forEach((c) => {
+    flagOf[c.countryA.name] = c.countryA.flag;
+    flagOf[c.countryB.name] = c.countryB.flag;
+  });
+  orders.forEach((o) => {
+    flagOf[o.fromCountry] ??= o.fromFlag;
+    flagOf[o.toCountry] ??= o.toFlag;
+  });
+  const pairs = [
+    ...new Set([
+      ...corridors.map((c) => pairKey(c.countryA.name, c.countryB.name)),
+      ...orders.map((o) => pairKey(o.fromCountry, o.toCountry)),
+    ]),
+  ].sort();
+
+  /** Open (still waiting) volume and order count in one direction. */
+  const openFlow = (from: string, to: string) => {
+    const open = orders.filter(
+      (o) =>
+        o.fromCountry === from &&
+        o.toCountry === to &&
+        o.transferType !== 'direct_instant' &&
+        (o.status === 'open' || o.status === 'partially_matched')
+    );
+    return { amount: open.reduce((sum, o) => sum + o.remainingAmount, 0), count: open.length };
+  };
+  const pairStats = pairs.map((key) => {
+    const [a, b] = key.split('|');
+    const ab = openFlow(a, b);
+    const ba = openFlow(b, a);
+    return { key, a, b, ab, ba, matchable: Math.min(ab.amount, ba.amount) };
+  });
+
   const filteredOrders = orders.filter((order) => {
     if (selectedStatus === 'matching' && order.status !== 'open' && order.status !== 'partially_matched') {
       return false;
@@ -84,11 +119,11 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
       return false;
     }
 
-    if (selectedCorridor !== 'all') {
-      const matchCorridor =
-        order.fromCountry.toLowerCase().includes(selectedCorridor) ||
-        order.toCountry.toLowerCase().includes(selectedCorridor);
-      if (!matchCorridor) return false;
+    if (selectedPair !== 'all') {
+      const [a, b] = selectedPair.split('|');
+      const inPair =
+        (order.fromCountry === a && order.toCountry === b) || (order.fromCountry === b && order.toCountry === a);
+      if (!inPair) return false;
     }
 
     if (searchQuery.trim()) {
@@ -112,7 +147,7 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Transfers & Audit Ledger
+              Live Orders & Audit Ledger
             </h1>
             {onOpenTour && (
               <button
@@ -205,10 +240,10 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
                 <button
                   onClick={onSimulateOpposingOrder}
                   className="text-[11px] text-slate-900 dark:text-white font-medium hover:underline flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded"
-                  title="Inject simulated opposing peer order from Kenya to Canada"
+                  title="Place a real, server-signed testnet order from an anonymous counterparty in the opposite direction"
                 >
                   <Plus className="w-3 h-3" />
-                  <span>Simulate Opposing Bob Order (Kenya → Canada $200)</span>
+                  <span>Simulate anonymous opposing order</span>
                 </button>
               )}
               <button
@@ -221,10 +256,12 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
             </div>
           </div>
           <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-            Two-Way Street relies on <strong>bilateral opposite-direction demand</strong> in the same corridor.
+            Two-Way Street relies on <strong>bilateral opposite-direction demand</strong> between the same two countries.
             For example, a transfer from <strong>Canada → Kenya</strong> only matches when someone else submits a transfer from <strong>Kenya → Canada</strong>.
-            If no opposing transfer exists at that moment, your USDC sits safely in the Soroban smart contract escrow queue with an active countdown timer.
-            Once an opposite transfer is submitted (or when your timer expires), the remaining funds automatically execute via your chosen remainder policy (Direct Stellar instant transfer or refund).
+            Until a match is found, the money you want to send simply stays where it is: in your bank account, or with the
+            agent or mobile wallet (MoneyGram, M-Pesa…) where you paid it in. Nothing is converted to crypto yet. Whatever
+            matches is routed locally. When your timer runs out, only the amount that still has to cross the border is
+            converted to USDC and sent via Stellar Blockchain, so blockchain and conversion fees apply only to that part.
           </p>
         </div>
       )}
@@ -248,7 +285,7 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
         </div>
 
         <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <span className="text-[11px] text-slate-500 block mb-0.5">Active in Escrow</span>
+          <span className="text-[11px] text-slate-500 block mb-0.5">Waiting for a match</span>
           <div className="text-lg font-bold font-mono-numbers text-slate-900 dark:text-white">
             ${inFlightEscrow.toFixed(2)}
           </div>
@@ -262,6 +299,78 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
           </div>
           <span className="text-[10px] text-slate-400 font-mono-numbers">vs. standard off-ramp</span>
         </div>
+      </div>
+
+      {/* Live supply & demand by direction */}
+      <div className="border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 p-3.5 text-xs space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="font-semibold text-slate-900 dark:text-white">
+            {selectedPair === 'all' ? 'Open orders across all countries' : 'Open orders in each direction'}
+          </span>
+          <span className="text-[10px] text-slate-400">Unmatched amounts still waiting, across all users (anonymous)</span>
+        </div>
+        {selectedPair === 'all' ? (
+          (() => {
+            // Totals across every country pair in the database.
+            const waiting = pairStats.reduce((sum, p) => sum + p.ab.amount + p.ba.amount, 0);
+            const count = pairStats.reduce((sum, p) => sum + p.ab.count + p.ba.count, 0);
+            const matchable = pairStats.reduce((sum, p) => sum + p.matchable, 0);
+            const activePairs = pairStats.filter((p) => p.ab.count + p.ba.count > 0).length;
+            const unmatched = Math.max(0, waiting - 2 * matchable);
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-500 block">Waiting, all directions</span>
+                  <span className="text-lg font-bold font-mono-numbers text-slate-900 dark:text-white">${waiting.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {count} open order{count === 1 ? '' : 's'} · {activePairs} active country pair{activePairs === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-md border-2 border-slate-900 dark:border-white">
+                  <span className="text-[11px] text-slate-500 block">Can match right now</span>
+                  <span className="text-lg font-bold font-mono-numbers text-slate-900 dark:text-white">${matchable.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-400 block">Paid locally in each country, no crypto conversion</span>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-500 block">Would go via Stellar if no one else arrives</span>
+                  <span className="text-lg font-bold font-mono-numbers text-slate-900 dark:text-white">${unmatched.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-400 block">Unmatched amounts, converted to USDC when timers run out</span>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          (() => {
+            const p = pairStats.find((x) => x.key === selectedPair);
+            if (!p) return null;
+            const card = (from: string, to: string, flow: { amount: number; count: number }) => (
+              <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+                <span className="text-[11px] text-slate-500 block">
+                  {flagOf[from]} {from} → {flagOf[to]} {to}
+                </span>
+                <span className="text-lg font-bold font-mono-numbers text-slate-900 dark:text-white">${flow.amount.toFixed(2)}</span>
+                <span className="text-[10px] text-slate-400 block">
+                  {flow.count} open order{flow.count === 1 ? '' : 's'}
+                </span>
+              </div>
+            );
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {card(p.a, p.b, p.ab)}
+                {card(p.b, p.a, p.ba)}
+                <div className="p-3 rounded-md border-2 border-slate-900 dark:border-white">
+                  <span className="text-[11px] text-slate-500 block">Can match right now</span>
+                  <span className="text-lg font-bold font-mono-numbers text-slate-900 dark:text-white">${p.matchable.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {p.ab.amount === p.ba.amount
+                      ? 'Balanced'
+                      : `${p.ab.amount > p.ba.amount ? p.a : p.b} side has $${Math.abs(p.ab.amount - p.ba.amount).toFixed(2)} more waiting`}
+                  </span>
+                </div>
+              </div>
+            );
+          })()
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -301,15 +410,20 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
           </div>
 
           <select
-            value={selectedCorridor}
-            onChange={(e) => setSelectedCorridor(e.target.value)}
+            value={selectedPair}
+            onChange={(e) => setSelectedPair(e.target.value)}
             className="px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md text-slate-700 dark:text-slate-300"
+            title="Show both directions between two countries"
           >
-            <option value="all">All corridors</option>
-            <option value="kenya">Canada ⇄ Kenya</option>
-            <option value="nigeria">US ⇄ Nigeria</option>
-            <option value="argentina">EU ⇄ Argentina</option>
-            <option value="philippines">US ⇄ Philippines</option>
+            <option value="all">All countries</option>
+            {pairs.map((key) => {
+              const [x, y] = key.split('|');
+              return (
+                <option key={key} value={key}>
+                  {flagOf[x]} {x} ⇄ {flagOf[y]} {y}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -366,7 +480,7 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
 
                       <td className="px-4 py-3 font-sans">
                         <span className="text-slate-800 dark:text-slate-200 font-medium">
-                          {order.fromFlag} → {order.toFlag} {order.toCountry}
+                          {order.fromFlag} {order.fromCountry} → {order.toFlag} {order.toCountry}
                         </span>
                       </td>
 
@@ -411,12 +525,25 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
                             )}
                             {order.status === 'fallback_executed' && (
                               <span className="text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Direct Payout
+                                <CheckCircle2 className="w-3 h-3" /> Remainder Paid (USDC via Stellar Blockchain)
                               </span>
                             )}
                             {order.status === 'refunded' && (
                               <span className="text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1">
-                                <RotateCcw className="w-3 h-3" /> Refunded
+                                <RotateCcw className="w-3 h-3" /> Released
+                              </span>
+                            )}
+                            {order.status === 'payout_pending' && (
+                              <span className="text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Paying (USDC via Stellar Blockchain)…
+                              </span>
+                            )}
+                            {order.status === 'payout_failed' && (
+                              <span
+                                className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1"
+                                title={order.payoutError}
+                              >
+                                <RotateCcw className="w-3 h-3" /> Payout failed
                               </span>
                             )}
                           </span>
@@ -427,19 +554,6 @@ export const TransactionDashboard: React.FC<TransactionDashboardProps> = ({
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           {isPending && order.remainingAmount > 0 && (
                             <>
-                              {onOpenConvertRemainder && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => onOpenConvertRemainder(order)}
-                                    className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline"
-                                    title="Convert remaining USDC to local fiat bank deposit"
-                                  >
-                                    Convert to Bank
-                                  </button>
-                                  <span className="text-slate-300">·</span>
-                                </>
-                              )}
                               <button
                                 type="button"
                                 onClick={() => onInstantSendRemainder(order.id)}

@@ -23,7 +23,6 @@ interface OrderReceiptModalProps {
   onInstantSendRemainder?: (orderId: string) => void;
   onInstantRefundRemainder?: (orderId: string) => void;
   onFastForwardExpiry?: (orderId: string) => void;
-  onOpenConvertRemainder?: (order: TransferOrder) => void;
   latestLedger?: number;
 }
 
@@ -33,7 +32,6 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
   onInstantSendRemainder,
   onInstantRefundRemainder,
   onFastForwardExpiry,
-  onOpenConvertRemainder,
   latestLedger = 48922450,
 }) => {
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
@@ -197,12 +195,22 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 )}
                 {order.status === 'fallback_executed' && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 font-semibold">
-                    <CheckCircle2 className="w-3 h-3" /> Direct Fallback Dispatched
+                    <CheckCircle2 className="w-3 h-3" /> Remainder Paid (USDC via Stellar Blockchain)
                   </span>
                 )}
                 {order.status === 'refunded' && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400 font-semibold">
-                    <CheckCircle2 className="w-3 h-3" /> Refunded to Wallet
+                    <CheckCircle2 className="w-3 h-3" /> Remainder Released (nothing was charged)
+                  </span>
+                )}
+                {order.status === 'payout_pending' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 font-semibold">
+                    <Clock className="w-3 h-3" /> Paying Remainder (USDC via Stellar Blockchain)…
+                  </span>
+                )}
+                {order.status === 'payout_failed' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
+                    Payout failed: {order.payoutError}
                   </span>
                 )}
               </div>
@@ -214,12 +222,12 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 ${order.amount.toFixed(2)} USDC
               </div>
               <span className="text-[10px] text-slate-400 font-mono-numbers">
-                Escrowed on Soroban
+                Pre-authorized · nothing charged until settled
               </span>
             </div>
 
             <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-              <span className="text-[11px] text-slate-500 block mb-0.5">Corridor Route</span>
+              <span className="text-[11px] text-slate-500 block mb-0.5">Route</span>
               <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <span>{order.fromFlag} {order.fromCountry}</span>
                 <ArrowRight className="w-3 h-3 text-slate-400" />
@@ -275,7 +283,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 
             <div className="p-4 space-y-3 font-mono-numbers">
               <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
-                <span className="text-slate-600 dark:text-slate-400">Total USDC Committed to Escrow:</span>
+                <span className="text-slate-600 dark:text-slate-400">Total amount (USD):</span>
                 <span className="font-semibold text-slate-900 dark:text-white">${order.amount.toFixed(2)} USDC</span>
               </div>
 
@@ -299,6 +307,27 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 </span>
               </div>
 
+              {/* How the sender pays in the matched amount */}
+              {order.fundingMethod && (
+                <div className="mt-3 p-2.5 rounded bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-[11px] font-sans">
+                  <span className="text-slate-500 block">Matched amount paid by the sender via</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {order.fundingMethod.providerName}
+                  </span>{' '}
+                  <span className="text-slate-500">
+                    ({order.fundingMethod.kindLabel}
+                    {order.fundingMethod.eta ? ` · ${order.fundingMethod.eta}` : ''})
+                  </span>
+                  <span className="block text-[10px] text-slate-400 font-mono mt-0.5">
+                    {Object.values(order.fundingMethod.details).join(' · ')}
+                  </span>
+                  <span className="block text-[10px] text-slate-400 mt-0.5">
+                    Recipient collects through the partner network however they prefer. Unmatched amount → USDC to
+                    their Stellar wallet as USDC via Stellar Blockchain.
+                  </span>
+                </div>
+              )}
+
               {/* Match History Log */}
               {order.matchHistory && order.matchHistory.length > 0 ? (
                 <div className="mt-3 pt-2">
@@ -318,6 +347,18 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                           <span className="text-slate-400 block font-mono text-[10px]">
                             {new Date(rec.timestamp).toLocaleTimeString()} · Payout to {rec.recipientSettled}
                           </span>
+                          {rec.funding && (
+                            <span className="block mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                              Paid in via <strong>{rec.funding.providerName}</strong> ({rec.funding.kindLabel}) ·{' '}
+                              {rec.funding.currency} {rec.funding.localAmount.toFixed(2)} ·{' '}
+                              <span className="font-mono">Ref {rec.funding.reference}</span> ·{' '}
+                              {rec.funding.status.replace(/_/g, ' ')}
+                              <span className="block text-[10px] text-slate-400 mt-0.5">{rec.funding.instructions}</span>
+                              <span className="block text-[10px] text-slate-400 mt-0.5">
+                                {rec.funding.delivery.note} (simulated rails)
+                              </span>
+                            </span>
+                          )}
                         </div>
                         <span className="font-bold text-emerald-600 dark:text-emerald-400">
                           +${rec.amount.toFixed(2)} USDC
@@ -372,16 +413,6 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                     className="flex-1 py-2 px-3 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <span>Refund the Rest to Wallet</span>
-                  </button>
-                )}
-                {onOpenConvertRemainder && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenConvertRemainder(order)}
-                    className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Convert Rest to Bank (SEP-31)</span>
                   </button>
                 )}
               </div>
@@ -528,18 +559,29 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
               <span className="text-[10px] text-slate-400 font-mono">Horizon Live</span>
             </div>
 
-            <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-slate-500">Escrow Deposit Tx:</span>
-              <a
-                href={`https://stellar.expert/explorer/testnet/tx/${order.depositTxHash.replace('0x', '')}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
-              >
-                <span>{order.depositTxHash.slice(0, 18)}...</span>
-                <ExternalLink className="w-3 h-3 text-slate-400" />
-              </a>
-            </div>
+            {order.depositTxHash && (
+              <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">USDC Pre-authorization Tx (no funds moved):</span>
+                <a
+                  href={`https://stellar.expert/explorer/testnet/tx/${order.depositTxHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
+                >
+                  <span>{order.depositTxHash.slice(0, 18)}...</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                </a>
+              </div>
+            )}
+
+            {order.matchHistory.length > 0 && (
+              <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">Matched volume (netted off-chain):</span>
+                <span className="text-slate-900 dark:text-white font-mono font-medium">
+                  {order.matchHistory.map((m) => m.txHash).join(', ')}
+                </span>
+              </div>
+            )}
 
             {order.settlementTxHash && (
               <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
@@ -559,10 +601,10 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
             {order.fallbackTxHash && (
               <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
                 <span className="text-slate-500">
-                  {order.status === 'refunded' ? 'Refund Release Tx:' : 'Direct Fallback Payment Tx:'}
+                  {order.transferType === 'direct_instant' ? 'Direct USDC Payment Tx:' : 'Soroban Remainder Payout Tx:'}
                 </span>
                 <a
-                  href={`https://stellar.expert/explorer/testnet/tx/${order.fallbackTxHash.replace('0x', '')}`}
+                  href={`https://stellar.expert/explorer/testnet/tx/${order.fallbackTxHash}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
@@ -589,7 +631,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold rounded-md bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 transition-colors shadow-xs"
           >
-            Done & View Transfers
+            Done & View Live Orders
           </button>
         </div>
       </div>

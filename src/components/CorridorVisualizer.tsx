@@ -10,28 +10,29 @@ import {
   Check,
 } from 'lucide-react';
 import { Corridor, TransferOrder, BatchSettlementResult } from '../types';
-import { executeTwoWayMatching } from '../utils/matchingEngine';
-import { CANONICAL_SCENARIO_ORDERS } from '../data/mockData';
+import { api } from '../services/api';
 
 interface CorridorVisualizerProps {
   corridors: Corridor[];
   orders: TransferOrder[];
-  onUpdateOrders: (orders: TransferOrder[]) => void;
+  onOrdersChanged: (orders: TransferOrder[]) => void;
+  onShowToast: (message: string) => void;
   onSelectOrder: (order: TransferOrder) => void;
 }
 
 export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
   corridors,
   orders,
-  onUpdateOrders,
+  onOrdersChanged,
+  onShowToast,
   onSelectOrder,
 }) => {
   const [selectedCorridorId, setSelectedCorridorId] = useState<string>('CA-KE');
   const [isProcessingMatch, setIsProcessingMatch] = useState<boolean>(false);
   const [lastBatchResult, setLastBatchResult] = useState<BatchSettlementResult | null>(null);
   const [executionLogs, setExecutionLogs] = useState<string[]>([
-    'Stellar Horizon Testnet connected.',
-    'Escrow Contract CC7X...2WAY initialized for CA ⇄ KE.',
+    'Order book is stored server-side (SQLite). Matching nets opposing volume off-chain.',
+    "Only unmatched remainders are sent as USDC via Stellar Blockchain, when each order's matching window closes.",
   ]);
 
   const activeCorridor =
@@ -62,32 +63,51 @@ export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
 
   const matchableNow = Math.min(openVolAtoB, openVolBtoA);
 
-  const handleResetToCanonical = () => {
+  const handleResetToCanonical = async () => {
     setSelectedCorridorId('CA-KE');
-    const fresh: TransferOrder[] = JSON.parse(JSON.stringify(CANONICAL_SCENARIO_ORDERS));
-    onUpdateOrders(fresh);
+    setIsProcessingMatch(true);
     setLastBatchResult(null);
-    setExecutionLogs([
-      'Loaded canonical prompt orders:',
-      '• Alice: Canada → Kenya, 500 USDC (Priority 1, Fallback: Direct Stellar)',
-      '• Bob: Kenya → Canada, 200 USDC (Priority 2, Fallback: Refund)',
-      '• Charlie: Canada → Kenya, 300 USDC (Priority 3, Fallback: Refund)',
-    ]);
+    setExecutionLogs(['Resetting book and placing canonical orders with real testnet pre-authorizations...']);
+    try {
+      const res = await api.resetDemo(true);
+      onOrdersChanged(res.orders);
+      setExecutionLogs((prev) => [
+        ...prev,
+        'Loaded canonical orders (amounts scaled for testnet balances):',
+        '• Order 1: Canada → Kenya, 5 USDC (priority 1, 3 min window)',
+        '• Order 2: Kenya → Canada, 2 USDC (priority 2)',
+        '• Order 3: Canada → Kenya, 3 USDC (priority 3, 10 min window)',
+        'Order 2 matched order 1 for 2 USDC (netted off-chain, counterparties anonymous). Order 1’s 3 USDC remainder is sent as USDC via Stellar Blockchain at expiry.',
+      ]);
+    } catch (e) {
+      setExecutionLogs((prev) => [...prev, `Error: ${(e as Error).message}`]);
+      onShowToast(`Error: ${(e as Error).message}`);
+    } finally {
+      setIsProcessingMatch(false);
+    }
   };
 
-  const handleRunMatchingEngine = (forceSettle: boolean = false) => {
+  const handleRunMatchingEngine = async (forceSettle: boolean = false) => {
     setIsProcessingMatch(true);
-
-    setTimeout(() => {
-      const result = executeTwoWayMatching(orders, countryA, countryB, {
-        forceSettleRemainders: forceSettle,
-      });
-
-      onUpdateOrders(result.updatedOrders);
-      setLastBatchResult(result.settlementBatch);
-      setExecutionLogs((prev) => [...prev, ...result.logs]);
+    try {
+      const res = await api.match({ countryA, countryB, forceSettleRemainders: forceSettle });
+      onOrdersChanged(res.orders);
+      setLastBatchResult(res.batches[0] ?? null);
+      setExecutionLogs((prev) => [
+        ...prev,
+        ...res.batches.flatMap((b) =>
+          b.matchedPairs.map(
+            (p) => `[NETTED off-chain] ${p.settledAmount.toFixed(2)} USDC between two anonymous counterparties (${p.nettingRef})`
+          )
+        ),
+        `[Batch complete] ${res.totalVolumeNetted.toFixed(2)} USDC netted.` +
+          (forceSettle ? ' Remaining orders expired; remainders now settling per policy.' : ''),
+      ]);
+    } catch (e) {
+      setExecutionLogs((prev) => [...prev, `Error: ${(e as Error).message}`]);
+    } finally {
       setIsProcessingMatch(false);
-    }, 500);
+    }
   };
 
   return (
@@ -96,7 +116,7 @@ export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {activeCorridor.countryA.name} ⇄ {activeCorridor.countryB.name} Order Book
+            {activeCorridor.countryA.name} ⇄ {activeCorridor.countryB.name} Transaction History
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Bilateral matching queue pairing opposing cross-border flows.
@@ -140,13 +160,13 @@ export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
         <p className="text-[11px] leading-relaxed">
           Orders are placed in opposing queues ({activeCorridor.countryA.name} → {activeCorridor.countryB.name} vs. {activeCorridor.countryB.name} → {activeCorridor.countryA.name}).
           When opposing transfer commitments match in value, our Soroban contract executes atomic settlement so money never crosses the physical border.
-          Unmatched remainders stay in escrow until an opposing peer matches or until the deadline window closes, triggering the user's fallback policy.
+          Unmatched amounts stay in the sender's account until an opposing peer matches or the window closes; only then is the remainder converted to USDC and sent via Stellar Blockchain.
         </p>
       </div>
 
       {/* Corridor Selector Filter */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-        <span className="text-slate-400 mr-1">Corridor:</span>
+        <span className="text-slate-400 mr-1">Countries:</span>
         {corridors.map((c) => {
           const isActive = c.id === selectedCorridorId;
           return (
@@ -250,20 +270,8 @@ export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
               <span className="font-semibold text-slate-900 dark:text-white block">
                 Settlement Batch {lastBatchResult.batchId} Executed
               </span>
-              <div className="text-slate-500 font-mono-numbers text-[11px] mt-0.5 flex items-center gap-2">
-                <span>Stellar Ledger #{lastBatchResult.stellarLedgerSeq}</span>
-                <span>·</span>
-                <span>Gas: {lastBatchResult.stroopsGasCost} Stroops</span>
-                <span>·</span>
-                <a
-                  href={`https://stellar.expert/explorer/testnet/tx/${lastBatchResult.txHash.replace('0x', '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-slate-700 dark:text-slate-300 hover:underline flex items-center gap-0.5"
-                >
-                  <span>Tx: {lastBatchResult.txHash.slice(0, 16)}...</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+              <div className="text-slate-500 text-[11px] mt-0.5">
+                Netted off-chain (no USDC moved on Stellar) · {lastBatchResult.matchedPairs.length} fill(s)
               </div>
             </div>
             <div className="text-right font-mono-numbers">
@@ -280,7 +288,7 @@ export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
               <div className="space-y-1">
                 {lastBatchResult.matchedPairs.map((p, i) => (
                   <div key={i} className="font-mono-numbers text-slate-700 dark:text-slate-300">
-                    ${p.settledAmount.toFixed(2)}: {p.senderA} pays {p.recipientA} ⇄ {p.senderB} pays {p.recipientB}
+                    ${p.settledAmount.toFixed(2)} netted between two anonymous counterparties · {p.nettingRef}
                   </div>
                 ))}
               </div>
@@ -289,13 +297,10 @@ export const CorridorVisualizer: React.FC<CorridorVisualizerProps> = ({
             <div>
               <span className="text-slate-500 block mb-1 font-medium">Remainder Dispositions:</span>
               <div className="space-y-1">
-                {lastBatchResult.remaindersProcessed.map((r, i) => (
-                  <div key={i} className="text-slate-700 dark:text-slate-300">
-                    {r.action === 'fallback_direct_payout'
-                      ? `Dispatched $${r.amount.toFixed(2)} directly to ${r.recipientOrSender} on Stellar`
-                      : `Refunded $${r.amount.toFixed(2)} to ${r.recipientOrSender}`}
-                  </div>
-                ))}
+                <div className="text-slate-700 dark:text-slate-300">
+                  Unmatched remainders are only charged when each window closes, then sent as USDC via Stellar Blockchain (or are
+                  released) when each order's matching window closes.
+                </div>
               </div>
             </div>
           </div>

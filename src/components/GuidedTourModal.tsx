@@ -52,16 +52,16 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
       badge: 'Step 1 of 6 · Routing Engine',
       title: 'Choose Transfer Mode',
       description:
-        'Select "Corridor Netting" to lock USDC in Soroban escrow and pair with opposing peers, saving 3–4% in recipient cash-out fees. Or choose "Direct Stellar" for 3-second instant delivery on-chain.',
+        'Select "Transfer Matching (Timed)" to be paired with people sending the opposite way: whatever matches is settled locally, with no crypto conversion. Or choose "Full Crypto Transfer (Immediate)" to send the whole amount right away as USDC via Stellar Blockchain.',
       preferredPosition: 'bottom',
     },
     {
       target: '[data-tour="corridor-route"]',
       tab: 'send',
-      badge: 'Step 2 of 6 · Bilateral Corridors',
-      title: 'Corridor & Amount Selection',
+      badge: 'Step 2 of 6 · Countries',
+      title: 'Countries & Amount',
       description:
-        'Choose your cross-border corridor (e.g. Canada ⇄ Kenya). Two-Way Street matches your outgoing funds against opposite-direction flows (e.g. Kenya → Canada) without cross-border banking rails.',
+        'Choose the two countries you are sending between (e.g. Canada ⇄ Kenya). Two-Way Street matches your outgoing funds against opposite-direction flows (e.g. Kenya → Canada) without cross-border banking rails.',
       preferredPosition: 'bottom',
     },
     {
@@ -70,23 +70,23 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
       badge: 'Step 3 of 6 · Time Priority',
       title: 'Matching Window & Deadline',
       description:
-        'Specify how long you are willing to wait for an opposing peer (15m, 1h, 24h, or custom). While active, your USDC is secured by Soroban escrow with an active countdown timer.',
+        'Specify how long you are willing to wait for an opposing peer (15m, 1h, 24h, or custom). While you wait, your money stays in your account; when the timer runs out, only the unmatched part is converted to USDC and sent via Stellar Blockchain.',
       preferredPosition: 'bottom',
     },
     {
-      target: '[data-tour="remainder-policy"]',
+      target: '[data-tour="payout-method"]',
       tab: 'send',
-      badge: 'Step 4 of 6 · Guaranteed Safety',
-      title: 'Automatic Remainder Resolution',
+      badge: 'Step 4 of 6 · How You Pay',
+      title: 'Choose How You Pay',
       description:
-        'Never worry about locked or lost funds: if your window closes without a complete match, choose whether the remainder automatically dispatches directly via Stellar or refunds to your wallet.',
+        'Choose where the matched amount comes from: your debit card, your bank account (RBC, TD, Equity…), an instant transfer like Interac, mobile money like M-Pesa, or cash at a MoneyGram agent. The partner network delivers it to the recipient however they prefer. Anything left unmatched when the window closes is sent to their Stellar wallet as USDC via Stellar Blockchain.',
       preferredPosition: 'top',
     },
     {
       target: '[data-tour="transfers-table"]',
       tab: 'dashboard',
       badge: 'Step 5 of 6 · Live Clearing',
-      title: 'Transfers Ledger & Audit Receipts',
+      title: 'Live Orders & Audit Receipts',
       description:
         'Monitor active clearing queues with real-time countdown timers. Click "Audit Receipt" on any transfer to inspect Soroban smart contract verification, ledger sequence numbers, and printable audit proofs.',
       preferredPosition: 'top',
@@ -97,7 +97,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
       badge: 'Step 6 of 6 · Matching Engine',
       title: 'Bilateral Netting & Counterparty Simulator',
       description:
-        'Transfers only match when opposing flows arrive in the same corridor. Use the "+ Simulate Opposing Bob Order" button here to test instant peer pairing and watch the netting engine clear opposing amounts!',
+        'Transfers only match when opposing flows arrive between the same two countries. Use the "+ Simulate anonymous opposing order" button here to test instant peer pairing and watch the netting engine clear opposing amounts!',
       preferredPosition: 'bottom',
     },
   ];

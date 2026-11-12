@@ -10,7 +10,7 @@ import { SOROBAN_RUST_CONTRACT_CODE, ARCHITECTURE_COMPONENTS } from '../utils/so
 export const ProtocolDocs: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'contract' | 'economics' | 'corridors' | 'roadmap'>('overview');
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
-  const [selectedMethod, setSelectedMethod] = useState<string>('deposit_intent');
+  const [selectedMethod, setSelectedMethod] = useState<string>('payout_remainder');
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(SOROBAN_RUST_CONTRACT_CODE);
@@ -20,41 +20,43 @@ export const ProtocolDocs: React.FC = () => {
 
   const contractMethods = [
     {
-      name: 'initialize',
-      role: 'Admin',
-      auth: 'admin.require_auth()',
-      description: 'Sets protocol admin and canonical Stellar USDC token address.',
-      signature: 'pub fn initialize(env: Env, admin: Address, usdc_token: Address) -> Result<(), EscrowError>',
-      storage: 'Instance Storage: [Admin, UsdcToken, NextOrderId]',
+      name: '__constructor',
+      role: 'Deployer',
+      auth: 'None (runs once at deploy)',
+      description: 'Sets the operator (admin) and the USDC Stellar Asset Contract address.',
+      signature: 'pub fn __constructor(env: Env, admin: Address, token: Address)',
+      storage: 'Instance Storage: [Admin, Token]',
     },
     {
-      name: 'deposit_intent',
+      name: 'usdc.approve (SEP-41)',
       role: 'Sender',
-      auth: 'sender.require_auth()',
-      description: 'Locks USDC in escrow and registers cross-border transfer intent with matching deadline.',
-      signature: 'pub fn deposit_intent(env: Env, sender: Address, recipient: Address, from_country: Symbol, to_country: Symbol, amount: i128, deadline_ledgers: u32, policy: RemainderPolicy) -> Result<u64, EscrowError>',
-      storage: 'Temporary Storage: [Order(order_id)] with extend_ttl(100, 1000)',
+      auth: 'sender (tx source)',
+      description:
+        'Not part of this contract: the pre-authorization the sender signs on the USDC token when placing an order. Grants this contract an allowance; no funds move.',
+      signature: 'fn approve(env, from: Address, spender: Address, amount: i128, expiration_ledger: u32)',
+      storage: 'USDC token allowance (from -> settlement contract)',
     },
     {
-      name: 'settle_matched_pair',
-      role: 'Relayer',
+      name: 'payout_remainder',
+      role: 'Operator',
       auth: 'admin.require_auth()',
-      description: 'Executes atomic bilateral settlement delivering matched funds directly to opposite recipients.',
-      signature: 'pub fn settle_matched_pair(env: Env, order_a_id: u64, order_b_id: u64, fill_amount: i128) -> Result<(), EscrowError>',
-      storage: 'Updates Order(A) and Order(B) remaining_amount and status',
+      description:
+        "Pays an expired order's unmatched remainder from sender to recipient with transfer_from. Matched volume never reaches this function.",
+      signature: 'pub fn payout_remainder(env: Env, order_id: u64, from: Address, to: Address, amount: i128) -> Result<(), Error>',
+      storage: 'Persistent Storage: [Paid(order_id)] (blocks double payout), emits remainder_paid',
     },
     {
-      name: 'resolve_unmatched_remainder',
-      role: 'Permissionless (Post-Deadline)',
-      auth: 'None (after deadline_ledger reached)',
-      description: 'Executes user remainder policy: dispatches direct Stellar payment or refunds sender wallet.',
-      signature: 'pub fn resolve_unmatched_remainder(env: Env, order_id: u64) -> Result<(), EscrowError>',
-      storage: 'Marks order as FallbackExecuted or Refunded',
+      name: 'paid_amount',
+      role: 'Anyone',
+      auth: 'None (read-only)',
+      description: 'Returns the amount already paid for an order id, if any. Used for crash recovery.',
+      signature: 'pub fn paid_amount(env: Env, order_id: u64) -> Option<i128>',
+      storage: 'Reads Paid(order_id)',
     },
   ];
 
   const currentMethod =
-    contractMethods.find((m) => m.name === selectedMethod) || contractMethods[1];
+    contractMethods.find((m) => m.name === selectedMethod) || contractMethods[2];
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 space-y-6">
@@ -74,7 +76,7 @@ export const ProtocolDocs: React.FC = () => {
           { id: 'overview', label: 'Overview & Flow' },
           { id: 'contract', label: 'Soroban Contract' },
           { id: 'economics', label: 'Netting Economics' },
-          { id: 'corridors', label: 'Corridors & Risks' },
+          { id: 'corridors', label: 'Countries & Risks' },
           { id: 'roadmap', label: 'Hackathon Roadmap' },
         ].map((tab) => {
           const isActive = activeSubTab === tab.id;
@@ -102,20 +104,20 @@ export const ProtocolDocs: React.FC = () => {
               Two-Way Street Matching Mechanism
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Traditional cross-border remittances push money unidirectionally across borders, forcing destination anchors to constantly rebalance bank accounts via expensive SWIFT wires. Two-Way Street pairs opposite-direction transfers within a corridor so value is cleared domestically.
+              Traditional cross-border remittances push money unidirectionally across borders, forcing destination anchors to constantly rebalance bank accounts via expensive SWIFT wires. Two-Way Street pairs opposite-direction transfers between the same two countries so value is cleared domestically.
             </p>
 
             <div className="p-3.5 border border-slate-200 dark:border-slate-800 rounded bg-slate-50 dark:bg-slate-800/40 space-y-2">
               <span className="font-semibold text-slate-900 dark:text-white block">
-                Canonical Scenario (Alice, Bob, Charlie)
+                Canonical Scenario (three anonymous orders)
               </span>
               <ul className="space-y-1 text-slate-600 dark:text-slate-400 list-disc pl-4 font-mono-numbers">
-                <li><strong>Alice</strong> (Canada → Kenya): $500 USDC (Priority 1, Fallback: Direct Stellar)</li>
-                <li><strong>Bob</strong> (Kenya → Canada): $200 USDC (Priority 2, Fallback: Refund)</li>
-                <li><strong>Charlie</strong> (Canada → Kenya): $300 USDC (Priority 3, Fallback: Refund)</li>
+                <li><strong>Order 1</strong> (Canada → Kenya): $500 USDC (priority 1)</li>
+                <li><strong>Order 2</strong> (Kenya → Canada): $200 USDC (priority 2)</li>
+                <li><strong>Order 3</strong> (Canada → Kenya): $300 USDC (priority 3)</li>
               </ul>
               <p className="text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-800 font-sans">
-                <strong>Execution:</strong> Canada → Kenya demand ($800) meets Kenya → Canada demand ($200). Alice arrived first, so Bob's $200 pairs with Alice's first $200. Bob is 100% settled. Alice is partially filled ($200/$500). When the matching window closes, Alice's remaining $300 dispatches directly to her Kenyan recipient via Stellar, while Charlie's $300 refunds to his wallet.
+                <strong>Execution:</strong> Canada → Kenya demand ($800) meets Kenya → Canada demand ($200). Order 1 arrived first, so order 2's $200 pairs with order 1's first $200, netted off-chain; neither sender learns who the other is. Order 2 is fully settled; order 1 is partially filled ($200/$500). When each matching window closes, any unmatched amount (order 1's $300, order 3's $300) is paid to the recipient's Stellar wallet in USDC via the Soroban contract.
               </p>
             </div>
 
@@ -176,7 +178,7 @@ export const ProtocolDocs: React.FC = () => {
           {/* Rust Code Box */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-950 overflow-hidden text-xs">
             <div className="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center text-slate-300 font-mono">
-              <span>contracts/two_way_escrow/src/lib.rs</span>
+              <span>soroban/contracts/twoway_settlement/src/lib.rs</span>
               <button
                 onClick={handleCopyCode}
                 className="px-2.5 py-1 text-xs rounded border border-slate-700 hover:bg-slate-800 text-slate-200"
@@ -195,7 +197,7 @@ export const ProtocolDocs: React.FC = () => {
       {activeSubTab === 'economics' && (
         <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 text-xs leading-relaxed space-y-4">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Matching vs. Direct Stellar Transfers
+            Transfer Matching vs. Full Crypto Transfers
           </h2>
           <p className="text-slate-600 dark:text-slate-400">
             A native Stellar USDC transfer costs $0.00001 and completes in 3-5 seconds. Why match transfers?
@@ -230,7 +232,7 @@ export const ProtocolDocs: React.FC = () => {
       {activeSubTab === 'corridors' && (
         <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 text-xs leading-relaxed space-y-4">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Corridors & Operational Risks
+            Countries & Operational Risks
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -255,7 +257,7 @@ export const ProtocolDocs: React.FC = () => {
               <strong>Asymmetry:</strong> Automated direct Stellar fallback ensures users are never stranded.
             </div>
             <div className="text-slate-600 dark:text-slate-400">
-              <strong>Compliance:</strong> Local anchors execute KYC under SEP-31 before authorizing escrow deposits.
+              <strong>Compliance:</strong> Local anchors execute KYC under SEP-31 before any money moves.
             </div>
           </div>
         </div>
@@ -272,7 +274,7 @@ export const ProtocolDocs: React.FC = () => {
             <div className="p-2.5 border border-slate-200 dark:border-slate-800 rounded">
               <span className="font-mono text-slate-400 block mb-0.5">Days 1–3</span>
               <span className="font-semibold text-slate-900 dark:text-white">Soroban Contract</span>
-              <p className="text-slate-500 mt-1">Escrow and settlement logic tested via cargo test.</p>
+              <p className="text-slate-500 mt-1">Settlement contract tested via cargo test.</p>
             </div>
 
             <div className="p-2.5 border border-slate-200 dark:border-slate-800 rounded">

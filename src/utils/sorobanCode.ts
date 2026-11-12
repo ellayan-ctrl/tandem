@@ -1,284 +1,43 @@
 /**
- * Soroban Smart Contract Architecture Specification & Rust Implementation
- * Protocol: Two-Way Street USDC Transfer Escrow & Netting Contract
- * Target: Stellar Soroban SDK v21+
+ * The deployed Soroban contract source (soroban/contracts/twoway_settlement/src/lib.rs),
+ * imported verbatim so the docs page always shows the real contract.
  */
+import contractSource from '../../soroban/contracts/twoway_settlement/src/lib.rs?raw';
 
-export const SOROBAN_RUST_CONTRACT_CODE = `//! Two-Way Street USDC Cross-Border Escrow & Settlement Contract
-//! Stellar Innovation Challenge Hackathon
-#![no_std]
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype,
-    token, Address, Env, String, Symbol, Vec, Val
-};
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum EscrowError {
-    AlreadyInitialized = 1,
-    Unauthorized = 2,
-    InvalidAmount = 3,
-    OrderNotFound = 4,
-    OrderNotOpen = 5,
-    DeadlineNotReached = 6,
-    DeadlineAlreadyPassed = 7,
-    CorridorMismatch = 8,
-    InsufficientEscrowBalance = 9,
-    ZeroFillProhibited = 10,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[contracttype]
-pub enum RemainderPolicy {
-    DirectStellarFallback = 1, // Fallback to immediate direct payment
-    RefundToSender = 2,        // Return remaining USDC to sender
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[contracttype]
-pub enum OrderStatus {
-    Open = 1,
-    PartiallyMatched = 2,
-    Settled = 3,
-    Refunded = 4,
-    FallbackExecuted = 5,
-    Cancelled = 6,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[contracttype]
-pub struct TransferIntent {
-    pub order_id: u64,
-    pub sender: Address,
-    pub recipient: Address,
-    pub from_country: Symbol,
-    pub to_country: Symbol,
-    pub total_amount: i128,
-    pub matched_amount: i128,
-    pub remaining_amount: i128,
-    pub deadline_ledger: u32,
-    pub policy: RemainderPolicy,
-    pub status: OrderStatus,
-    pub created_at_ledger: u32,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub enum DataKey {
-    Admin,
-    UsdcToken,
-    NextOrderId,
-    Order(u64),
-    CorridorVolume(Symbol, Symbol),
-}
-
-#[contract]
-pub struct TwoWayEscrowContract;
-
-#[contractimpl]
-impl TwoWayEscrowContract {
-    /// Initialize the escrow with the official Stellar USDC token address
-    pub fn initialize(env: Env, admin: Address, usdc_token: Address) -> Result<(), EscrowError> {
-        admin.require_auth();
-        if env.storage().instance().has(&DataKey::Admin) {
-            return Err(EscrowError::AlreadyInitialized);
-        }
-        env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
-        env.storage().instance().set(&DataKey::NextOrderId, &1u64);
-        Ok(())
-    }
-
-    /// User creates a cross-border transfer intent and locks USDC into Soroban escrow
-    pub fn deposit_intent(
-        env: Env,
-        sender: Address,
-        recipient: Address,
-        from_country: Symbol,
-        to_country: Symbol,
-        amount: i128,
-        deadline_ledgers: u32,
-        policy: RemainderPolicy,
-    ) -> Result<u64, EscrowError> {
-        // Enforce sender cryptographic authorization
-        sender.require_auth();
-
-        if amount <= 0 {
-            return Err(EscrowError::InvalidAmount);
-        }
-
-        let usdc_address: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        let usdc_client = token::Client::new(&env, &usdc_address);
-
-        // Securely transfer USDC from sender to this smart contract escrow
-        usdc_client.transfer(&sender, &env.current_contract_address(), &amount);
-
-        let order_id: u64 = env.storage().instance().get(&DataKey::NextOrderId).unwrap_or(1);
-        env.storage().instance().set(&DataKey::NextOrderId, &(order_id + 1));
-
-        let current_ledger = env.ledger().sequence();
-        let deadline = current_ledger + deadline_ledgers;
-
-        let intent = TransferIntent {
-            order_id,
-            sender,
-            recipient,
-            from_country,
-            to_country,
-            total_amount: amount,
-            matched_amount: 0,
-            remaining_amount: amount,
-            deadline_ledger: deadline,
-            policy,
-            status: OrderStatus::Open,
-            created_at_ledger: current_ledger,
-        };
-
-        // Store with temporary/instance storage with automatic TTL extension
-        env.storage().temporary().set(&DataKey::Order(order_id), &intent);
-        env.storage().temporary().extend_ttl(&DataKey::Order(order_id), 100, 1000);
-
-        // Emit Soroban topic event
-        env.events().publish((Symbol::new(&env, "intent_deposited"), order_id), (amount, deadline));
-
-        Ok(order_id)
-    }
-
-    /// Match engine relayer executes bilateral netting batch
-    pub fn settle_matched_pair(
-        env: Env,
-        order_a_id: u64,
-        order_b_id: u64,
-        fill_amount: i128,
-    ) -> Result<(), EscrowError> {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
-        admin.require_auth();
-
-        if fill_amount <= 0 {
-            return Err(EscrowError::ZeroFillProhibited);
-        }
-
-        let mut order_a: TransferIntent = env.storage().temporary().get(&DataKey::Order(order_a_id))
-            .ok_or(EscrowError::OrderNotFound)?;
-        let mut order_b: TransferIntent = env.storage().temporary().get(&DataKey::Order(order_b_id))
-            .ok_or(EscrowError::OrderNotFound)?;
-
-        // Verify corridor symmetry (A->B matches with B->A)
-        if order_a.from_country != order_b.to_country || order_a.to_country != order_b.from_country {
-            return Err(EscrowError::CorridorMismatch);
-        }
-
-        if fill_amount > order_a.remaining_amount || fill_amount > order_b.remaining_amount {
-            return Err(EscrowError::InvalidAmount);
-        }
-
-        let usdc_address: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        let usdc_client = token::Client::new(&env, &usdc_address);
-
-        // Disburse matched USDC directly to opposite recipients
-        // Order A's escrow pays Recipient A (in destination country B)
-        usdc_client.transfer(&env.current_contract_address(), &order_a.recipient, &fill_amount);
-        // Order B's escrow pays Recipient B (in destination country A)
-        usdc_client.transfer(&env.current_contract_address(), &order_b.recipient, &fill_amount);
-
-        // Update Order A State
-        order_a.matched_amount += fill_amount;
-        order_a.remaining_amount -= fill_amount;
-        order_a.status = if order_a.remaining_amount == 0 { OrderStatus::Settled } else { OrderStatus::PartiallyMatched };
-
-        // Update Order B State
-        order_b.matched_amount += fill_amount;
-        order_b.remaining_amount -= fill_amount;
-        order_b.status = if order_b.remaining_amount == 0 { OrderStatus::Settled } else { OrderStatus::PartiallyMatched };
-
-        env.storage().temporary().set(&DataKey::Order(order_a_id), &order_a);
-        env.storage().temporary().set(&DataKey::Order(order_b_id), &order_b);
-
-        env.events().publish(
-            (Symbol::new(&env, "pair_settled"), order_a_id, order_b_id),
-            fill_amount
-        );
-
-        Ok(())
-    }
-
-    /// Resolve remainder once deadline has elapsed: trigger fallback direct transfer or refund
-    pub fn resolve_unmatched_remainder(env: Env, order_id: u64) -> Result<(), EscrowError> {
-        let mut order: TransferIntent = env.storage().temporary().get(&DataKey::Order(order_id))
-            .ok_or(EscrowError::OrderNotFound)?;
-
-        if order.status == OrderStatus::Settled || order.status == OrderStatus::Refunded || order.status == OrderStatus::FallbackExecuted {
-            return Err(EscrowError::OrderNotOpen);
-        }
-
-        let current_ledger = env.ledger().sequence();
-        if current_ledger < order.deadline_ledger {
-            return Err(EscrowError::DeadlineNotReached);
-        }
-
-        let remainder = order.remaining_amount;
-        if remainder <= 0 {
-            return Ok(());
-        }
-
-        let usdc_address: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        let usdc_client = token::Client::new(&env, &usdc_address);
-
-        match order.policy {
-            RemainderPolicy::DirectStellarFallback => {
-                // Send remainder directly to recipient wallet
-                usdc_client.transfer(&env.current_contract_address(), &order.recipient, &remainder);
-                order.status = OrderStatus::FallbackExecuted;
-                order.remaining_amount = 0;
-            }
-            RemainderPolicy::RefundToSender => {
-                // Return remainder to sender wallet
-                usdc_client.transfer(&env.current_contract_address(), &order.sender, &remainder);
-                order.status = OrderStatus::Refunded;
-                order.remaining_amount = 0;
-            }
-        }
-
-        env.storage().temporary().set(&DataKey::Order(order_id), &order);
-        env.events().publish((Symbol::new(&env, "remainder_resolved"), order_id), remainder);
-        Ok(())
-    }
-}
-`;
+export const SOROBAN_RUST_CONTRACT_CODE: string = contractSource;
 
 export const ARCHITECTURE_COMPONENTS = [
   {
-    title: '1. Soroban Smart Contract Escrow',
+    title: '1. Linked bank account (no crypto until settlement)',
+    tag: 'Bank + invisible wallet',
+    description:
+      "A user links a bank account (simulated sandbox in this demo); TwoWay creates an invisible Stellar wallet behind it. Placing an order only checks the bank balance and reserves the amount. Nothing is converted to USDC and nothing touches Soroban while the order waits for a match.",
+    invariants: [
+      'Order time: bank balance check + reservation only',
+      'Users never see keys or hold USDC',
+      'Wallet keys are server-held and encrypted at rest (custodial demo)',
+    ],
+  },
+  {
+    title: '2. Off-chain Matching Engine (SQLite)',
+    tag: 'Server',
+    description:
+      'Orders live in a SQLite book. FIFO time-priority matching per country pair with partial fills, on integer 7-decimal amounts. Matched volume cancels out and is settled off-chain through a pluggable netting method; it never touches Soroban.',
+    invariants: [
+      'Each match runs in one DB transaction',
+      'No float dust: amounts are integer units (1 USDC = 10^7)',
+      'Matched volume costs zero on-chain fees',
+    ],
+  },
+  {
+    title: '3. Soroban Remainder Settlement',
     tag: 'On-Chain Rust',
     description:
-      'Holds user USDC securely upon intent registration. Emits standardized Soroban event topics. Only releases funds upon verified bilateral pairing or deadline expiration with automated fallback/refund.',
+      "Only when the timer runs out does the system know exactly how much must cross the border. At that moment it debits exactly the unmatched amount from the bank, the on-ramp (a testnet treasury here) converts it to USDC in the invisible wallet, and the settlement contract's payout_remainder sends that exact amount to the recipient.",
     invariants: [
-      'Total held USDC == Sum(active orders remaining_amount)',
-      'Cryptographic sender auth required via require_auth()',
-      'Deterministic state transitions: Open -> Matched/Settled -> Closed',
-    ],
-  },
-  {
-    title: '2. Deterministic Matching Engine',
-    tag: 'Off-Chain Relayer',
-    description:
-      'Continuous double auction order queue running time-priority (FIFO) matching per corridor. Identifies equal and fractional opposing transfer requests, batches settlement transactions, and triggers on-chain settlement.',
-    invariants: [
-      'Zero price slippage: All transfers are 1:1 USDC stablecoin parity',
-      'Fair time-priority ordering prevents front-running',
-      'Atomic batch execution bounds gas fees to fractional stroops',
-    ],
-  },
-  {
-    title: '3. Adaptive Remainder Policy Router',
-    tag: 'User Sovereignty',
-    description:
-      'Solves the classical liquidity problem in cross-border matching: if opposing demand is insufficient, users never get stranded. The smart contract automatically executes their pre-signed fallback preference.',
-    invariants: [
-      'Fallback Option A: Direct Stellar PaymentOp delivers USDC to recipient on time',
-      'Fallback Option B: Trustless un-escrow refunds USDC back to sender wallet',
-      'Zero manual dispute arbitration needed',
+      'Admin (operator) auth required: admin.require_auth()',
+      'At most one payout per order id (AlreadyPaid)',
+      "Bounded by the sender's allowance and its expiry",
     ],
   },
   {
