@@ -218,6 +218,45 @@ export default function App() {
       );
     });
 
+  // Demo: an anonymous order ONWARD from your destination to a third country (e.g. you send Canada -> Kenya,
+  // someone sends Kenya -> Nigeria). Chain routing pays your recipient locally in Kenya and turns your money
+  // into one routed Canada -> Nigeria transfer, matched locally if possible, otherwise sent via Stellar at expiry.
+  const handleSimulateOnwardOrder = () =>
+    withToast(async () => {
+      const mine = orders.find(
+        (o) =>
+          !!account &&
+          o.senderAddress === account.wallet.publicKey &&
+          o.transferType === 'matched_pool' &&
+          (o.status === 'open' || o.status === 'partially_matched'),
+      );
+      if (!mine) throw new Error('Place a Transfer Matching order first, then simulate an onward order from its destination.');
+      const flagOf = {};
+      CORRIDORS.forEach((c) => {
+        flagOf[c.countryA.name] = c.countryA.flag;
+        flagOf[c.countryB.name] = c.countryB.flag;
+      });
+      const third = ['Nigeria', 'Philippines', 'Kenya', 'Canada', 'Argentina'].find((c) => c !== mine.fromCountry && c !== mine.toCountry);
+      const amount = Math.max(0.01, Math.round(mine.remainingAmount * 60) / 100);
+      showToast(`Placing an anonymous ${mine.toCountry} → ${third} order (first time sets up demo accounts, ~10s)...`);
+      const { batches } = await api.counterpartyOrder({
+        fromCountry: mine.toCountry,
+        toCountry: third,
+        fromFlag: mine.toFlag,
+        toFlag: flagOf[third],
+        amount: amount.toFixed(2),
+      });
+      const fresh = await api.orders();
+      setOrders(fresh);
+      setInspectingOrder(fresh.find((o) => o.id === mine.id) ?? null);
+      const routed = batches.filter((b) => b.settlementMethod === 'chain_routing').reduce((s, b) => s + b.totalVolumeNetted, 0);
+      showToast(
+        routed > 0
+          ? `Routed $${routed.toFixed(2)}: your recipient in ${mine.toCountry} is paid locally, and that part of your money now goes ${mine.fromCountry} → ${third} instead.`
+          : `Anonymous ${mine.toCountry} → ${third} order added to the queue (no route possible: check the timers).`,
+      );
+    });
+
   // Send the unmatched remainder now: bank -> USDC -> recipient via Stellar Blockchain.
   const handleInstantSendRemainder = (orderId) =>
     withToast(async () => {
@@ -288,6 +327,7 @@ export default function App() {
             onNavigateToSend={() => setActiveTab('send')}
             onRunMatching={handleRunGlobalMatching}
             onSimulateOpposingOrder={handleSimulateOpposingOrder}
+            onSimulateOnwardOrder={handleSimulateOnwardOrder}
             autoMatchEnabled={autoMatchEnabled}
             onToggleAutoMatch={() => setAutoMatchEnabled(!autoMatchEnabled)}
             onOpenTour={() => setTourOpen(true)}

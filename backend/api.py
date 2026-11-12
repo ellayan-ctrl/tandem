@@ -85,6 +85,8 @@ def _serialize_full(o: sqlite3.Row, fills: list) -> dict:
         "deadlineTimestamp": o["deadline_at"],
         "remainderPolicy": o["remainder_policy"],
         "transferType": o["transfer_type"],
+        # Routed legs (chain routing): the country the route skipped, e.g. Canada -> Nigeria via Kenya.
+        "routeVia": o["route_via"],
         "matchHistory": history,
         "escrowContractId": config.settlement_contract_id,
         "depositTxHash": o["preauth_tx_hash"] or "",
@@ -138,8 +140,8 @@ def serialize_batch(s: dict) -> dict:
             for f in s["fills"]
         ],
         "totalVolumeNetted": from_units(s["totalUnits"]),
-        "settlementMethod": "offchain_netting",
-        "stroopsGasCost": 0,  # matched volume never goes on-chain
+        "settlementMethod": s.get("method", "offchain_netting"),
+        "stroopsGasCost": 0,  # nothing here goes on-chain (routed legs settle later, at their own expiry)
         "stellarLedgerSeq": 0,
         "txHash": "",
         "remaindersProcessed": [],

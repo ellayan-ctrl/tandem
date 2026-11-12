@@ -104,3 +104,42 @@ def offchain_netting(batch_id: str, index: int, amount_units: int, order_a: dict
         "fundingA": funding_record(order_a, amount_units),
         "fundingB": funding_record(order_b, amount_units),
     }
+
+
+def chain_routing(batch_id: str, index: int, amount_units: int, inbound: dict, outbound: dict, hub: str, route_id: str) -> dict:
+    """Records for one chain fill: inbound = A -> hub order, outbound = hub -> C order.
+
+    The hub-side sender pays locally in the hub (charged now) and that money is delivered to the
+    inbound order's recipient there. The inbound sender is not charged now: their money becomes the
+    routed transfer `route_id` (A -> C) to the outbound order's recipient."""
+    origin, dest = inbound["fromCountry"], outbound["toCountry"]
+    # Hub-side sender: an ordinary local payment; their recipient is paid by the routed leg.
+    out_rec = funding_record(outbound, amount_units)
+    out_rec["delivery"]["note"] = (
+        f"{out_rec['delivery']['currency']} {out_rec['delivery']['localAmount']:,.2f} for {outbound['recipientName']} in {dest} "
+        f"comes from a sender in {origin} through routed transfer {route_id}: matched locally in {dest} if possible, "
+        "otherwise sent as USDC via Stellar Blockchain when its timer runs out."
+    )
+    # Inbound sender: recipient paid now from hub-side local money; their own payment moves to the routed leg.
+    in_rec = funding_record(inbound, amount_units)
+    pay = f"{in_rec['currency']} {in_rec['localAmount']:,.2f}"
+    in_rec.update({
+        "status": "routed",
+        "reference": route_id,
+        "instructions": (
+            f"Not charged yet. Your {pay} now goes to {dest} as routed transfer {route_id} instead of to {hub}: "
+            f"it is matched locally if a {dest} → {origin} transfer appears before the timer runs out, "
+            "otherwise sent as USDC via Stellar Blockchain then."
+        ),
+    })
+    in_rec["delivery"]["note"] = (
+        f"{in_rec['delivery']['currency']} {in_rec['delivery']['localAmount']:,.2f} delivered to {inbound['recipientName']} "
+        f"in {hub} from a {hub} sender's local payment (settled domestically, no cross-border leg)."
+    )
+    return {
+        "method": "chain_routing",
+        "status": "routed",
+        "ref": f"RTE-{batch_id}-{index + 1:02d}",
+        "fundingA": in_rec,
+        "fundingB": out_rec,
+    }

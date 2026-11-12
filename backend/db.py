@@ -118,6 +118,10 @@ def _migrate(db: sqlite3.Connection) -> None:
     # Which linked method pays the matched part, and which funds the unmatched part.
     add("orders", "bank_id", "INTEGER REFERENCES banks(id)")
     add("orders", "remainder_bank_id", "INTEGER REFERENCES banks(id)")
+    # Chain routing: a routed leg A -> C records the A -> B and B -> C orders it was formed from.
+    add("orders", "route_in_order_id", "INTEGER REFERENCES orders(id)")
+    add("orders", "route_out_order_id", "INTEGER REFERENCES orders(id)")
+    add("orders", "route_via", "TEXT")  # the hub country the route skipped
     # Move each account's original single bank into the banks table (once).
     db.execute(
         """INSERT INTO banks (account_id, provider_id, details_json, balance_minor, created_at)

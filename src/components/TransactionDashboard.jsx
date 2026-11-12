@@ -12,6 +12,7 @@ export const TransactionDashboard = ({
   onNavigateToSend,
   onRunMatching,
   onSimulateOpposingOrder,
+  onSimulateOnwardOrder,
   autoMatchEnabled = true,
   onToggleAutoMatch,
   onOpenTour,
@@ -29,7 +30,8 @@ export const TransactionDashboard = ({
     return () => clearInterval(timer);
   }, []);
 
-  const totalVolume = orders.reduce((sum, o) => sum + o.amount, 0);
+  // Routed legs re-route money already counted on the order they came from: don't count it twice.
+  const totalVolume = orders.filter((o) => o.transferType !== 'routed').reduce((sum, o) => sum + o.amount, 0);
   const totalMatched = orders.reduce((sum, o) => sum + o.matchedAmount, 0);
   const inFlightEscrow = orders
     .filter((o) => o.status === 'open' || o.status === 'partially_matched')
@@ -218,6 +220,16 @@ export const TransactionDashboard = ({
                   <span>Simulate anonymous opposing order</span>
                 </button>
               )}
+              {onSimulateOnwardOrder && (
+                <button
+                  onClick={onSimulateOnwardOrder}
+                  className="text-[11px] text-slate-900 dark:text-white font-medium hover:underline flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded"
+                  title="Place a real testnet order from your destination country onward to a third country, to see chain routing"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Simulate onward order (chain)</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowExplainer(false)}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
@@ -234,6 +246,13 @@ export const TransactionDashboard = ({
             account, or with the agent or mobile wallet (MoneyGram, M-Pesa…) where you paid it in. Nothing is converted to crypto yet.
             Whatever matches is routed locally. When your timer runs out, only the amount that still has to cross the border is converted to
             USDC and sent via Stellar Blockchain, so blockchain and conversion fees apply only to that part.
+          </p>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+            <strong>Chain routing:</strong> transfers also connect through a third country. If you send <strong>Canada → Kenya</strong>{' '}
+            and someone sends <strong>Kenya → Nigeria</strong>, their Kenyan money pays your recipient locally, and your money becomes one
+            routed <strong>Canada → Nigeria</strong> transfer. That routed transfer matches like any other (a Nigeria → Canada sender closes
+            the loop with nothing sent cross-border); otherwise only it goes via Stellar Blockchain. Routes form only while both timers have
+            at least a minute left, and the routed transfer keeps the earlier of the two deadlines.
           </p>
         </div>
       )}
@@ -445,6 +464,14 @@ export const TransactionDashboard = ({
                         <span className="text-slate-800 dark:text-slate-200 font-medium">
                           {order.fromFlag} {order.fromCountry} → {order.toFlag} {order.toCountry}
                         </span>
+                        {order.transferType === 'routed' && (
+                          <span
+                            className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300"
+                            title="Created by chain routing: two transfers through this country were combined into one"
+                          >
+                            Routed via {order.routeVia}
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-4 py-3 font-sans">

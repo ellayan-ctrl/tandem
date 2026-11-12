@@ -1,5 +1,11 @@
-"""Pure bilateral matching: FIFO per direction, partial fills, integer amounts.
-No I/O; the caller persists the result inside a DB transaction."""
+"""Pure matching, no I/O (the caller persists results inside a DB transaction). Integer amounts.
+
+1. Bilateral: A -> B against B -> A, FIFO per direction, partial fills. Both cross-border legs
+   disappear: each sender's local money pays the other order's recipient domestically.
+2. Chain routing: A -> B followed by B -> C (C != A). B's sender pays A->B's recipient locally in B,
+   which leaves ONE cross-border leg, A -> C (A's sender to C's recipient), instead of two. That
+   "routed leg" is a normal open order: a later C -> A order can match it bilaterally (closing the
+   loop with nothing on-chain); otherwise only it settles via Stellar when its timer runs out."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
@@ -13,6 +19,11 @@ class BookOrder:
     to_country: str
     remaining: int  # integer units
     created_at: int
+    deadline_at: int = 0  # ms; when the matching window closes
+    # Routed legs can still match bilaterally but are not chained again (keeps routes to one hop).
+    routable: bool = True
+    sender: str = ""  # sender wallet
+    recipient: str = ""  # recipient wallet
 
 
 @dataclass(frozen=True)
@@ -73,3 +84,51 @@ def crossed_pairs(book: List[BookOrder]) -> List[Tuple[str, str]]:
         if (to, frm) in directions:
             out[pair_key(frm, to)] = None
     return list(out)
+
+
+@dataclass(frozen=True)
+class ChainFill:
+    inbound_id: int  # X: A -> hub; its recipient is paid by the hub-side sender
+    outbound_id: int  # Y: hub -> C; its recipient is paid by the routed leg A -> C
+    amount: int
+    hub: str
+
+
+@dataclass
+class ChainResult:
+    fills: List[ChainFill] = field(default_factory=list)
+    remaining: Dict[int, int] = field(default_factory=dict)
+
+
+def match_chains(book: List[BookOrder], now_ms: int, min_window_ms: int) -> ChainResult:
+    """Pair orders INTO a hub country with orders OUT of it, oldest first.
+
+    "If the timers allow it": a chain is only formed while both windows are open with at least
+    `min_window_ms` left, and the routed leg takes the EARLIER of the two deadlines, so neither
+    recipient waits longer than their own sender agreed to. Pairs that are really opposite
+    transfers (C == A) are left to bilateral matching."""
+    work = {o.id: replace(o) for o in book if o.remaining > 0 and o.routable}
+    hubs = sorted({o.to_country for o in work.values()} & {o.from_country for o in work.values()})
+    result = ChainResult()
+    for hub in hubs:
+        inbound = sorted((o for o in work.values() if o.to_country == hub), key=_fifo)
+        outbound = sorted((o for o in work.values() if o.from_country == hub), key=_fifo)
+        for x in inbound:
+            for y in outbound:
+                if x.remaining == 0:
+                    break
+                if y.remaining == 0 or x.id == y.id:
+                    continue
+                if x.from_country == y.to_country:
+                    continue  # opposite directions: bilateral matching handles it
+                if min(x.deadline_at, y.deadline_at) - now_ms < min_window_ms:
+                    continue  # not enough time left on one of the timers
+                if x.sender and x.sender == y.recipient:
+                    continue  # the routed leg would pay its own sender
+                amount = min(x.remaining, y.remaining)
+                x.remaining -= amount
+                y.remaining -= amount
+                result.remaining[x.id] = x.remaining
+                result.remaining[y.id] = y.remaining
+                result.fills.append(ChainFill(x.id, y.id, amount, hub))
+    return result

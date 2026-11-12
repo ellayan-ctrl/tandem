@@ -18,11 +18,15 @@ from .config import config
 from .conversion import simulated_conversion
 from .db import transaction
 from .errors import ChainError, HttpError
-from .matching import BookOrder, crossed_pairs, match_pair, pair_key
-from .netting import offchain_netting
+from .matching import BookOrder, crossed_pairs, match_chains, match_pair, pair_key
+from .netting import chain_routing, offchain_netting
 from .shared_data import find_provider, fx_for, validate_selection
 
 ACTIVE = "('open','partially_matched')"
+# Order types that wait in the book: user orders and routed legs created by chain routing.
+MATCHABLE = "('matched_pool','routed')"
+# A chain is only formed if both timers have at least this long left.
+MIN_ROUTE_WINDOW_MS = 60_000
 POLICIES = ("direct_stellar_fallback", "refund_to_sender", "convert_to_fiat_bank")
 POLICY_ACTION = {"direct_stellar_fallback": "payout", "refund_to_sender": "release", "convert_to_fiat_bank": "convert"}
 UNRESOLVED = ("open", "partially_matched", "payout_failed")
@@ -195,75 +199,146 @@ class OrderService:
     # ---------------------------------------------------------- matching
 
     def match(self, pairs: Optional[List[Tuple[str, str]]] = None) -> list:
-        """Match the given country pairs (default: every pair with two-way volume) in one DB
-        transaction. Matched volume settles through off-chain netting and is debited from each
-        side's chosen payment method."""
+        """One DB transaction, three passes:
+          1. bilateral: opposite transfers between the same two countries (no cross-border leg left),
+          2. chain routing: A -> B + B -> C becomes one routed leg A -> C (one leg instead of two),
+          3. bilateral again, so a new routed leg A -> C can immediately match a waiting C -> A.
+        `pairs` limits pass 1 to those country pairs (default: every pair with two-way volume).
+        Matched volume settles off-chain and is debited from each side's chosen payment method."""
         with transaction(self.db):
             now = now_ms()
-            rows = self.db.execute(
-                f"""SELECT * FROM orders WHERE status IN {ACTIVE} AND transfer_type = 'matched_pool'
-                      AND remaining_amount > 0 AND deadline_at > ?""",
-                (now,),
-            ).fetchall()
-            by_id = {r["id"]: r for r in rows}
-            book = [BookOrder(r["id"], r["from_country"], r["to_country"], r["remaining_amount"], r["created_at"]) for r in rows]
-            targets = [pair_key(a, b) for a, b in (pairs if pairs is not None else crossed_pairs(book))]
-            seen: set = set()
-            summaries = []
-
-            for a, b in targets:
-                if (a, b) in seen:
-                    continue
-                seen.add((a, b))
-                result = match_pair(book, a, b)
-                if not result.fills:
-                    continue
-
-                batch_id = f"B{_base36(now)}{secrets.token_hex(2).upper()}"
-                summary = {"batchId": batch_id, "pairId": f"{a}-{b}", "fills": [], "totalUnits": 0}
-                matched_delta: dict = {}
-
-                for index, f in enumerate(result.fills):
-                    oa, ob = by_id[f.order_a_id], by_id[f.order_b_id]
-
-                    def side(o: sqlite3.Row) -> dict:
-                        return {
-                            "publicId": o["public_id"],
-                            "senderName": o["sender_name"],
-                            "recipientName": o["recipient_name"],
-                            "fromCountry": o["from_country"],
-                            "toCountry": o["to_country"],
-                            "fundingMethod": json.loads(o["funding_method_json"]) if o["funding_method_json"] else None,
-                        }
-
-                    settled = offchain_netting(batch_id, index, f.amount, side(oa), side(ob))
-                    # Matched part is paid from each order's chosen method: debit it now, in local currency.
-                    for o in (oa, ob):
-                        if o["bank_id"]:
-                            self.accounts.debit(o["bank_id"], units_to_minor(f.amount, o["fx_rate"] or fx_for(o["from_country"])[1]))
-                    self.db.execute(
-                        """INSERT INTO fills (batch_id, order_a_id, order_b_id, amount, settlement_method, settlement_status,
-                             settlement_ref, funding_a_json, funding_b_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                        (
-                            batch_id, oa["id"], ob["id"], f.amount, settled["method"], settled["status"], settled["ref"],
-                            json.dumps(settled["fundingA"]), json.dumps(settled["fundingB"]), now,
-                        ),
-                    )
-                    matched_delta[oa["id"]] = matched_delta.get(oa["id"], 0) + f.amount
-                    matched_delta[ob["id"]] = matched_delta.get(ob["id"], 0) + f.amount
-                    summary["fills"].append({"amountUnits": f.amount, "ref": settled["ref"]})
-                    summary["totalUnits"] += f.amount
-
-                for oid, delta in matched_delta.items():
-                    remaining = result.remaining[oid]
-                    self.db.execute(
-                        "UPDATE orders SET matched_amount = matched_amount + ?, remaining_amount = ?, status = ? WHERE id = ?",
-                        (delta, remaining, "settled" if remaining == 0 else "partially_matched", oid),
-                    )
-                    # keep the in-memory book in sync for later pairs in this pass
-                    next(o for o in book if o.id == oid).remaining = remaining
-                summaries.append(summary)
+            summaries = self._bilateral_pass(now, pairs)
+            chains = self._chain_pass(now)
+            if chains:
+                summaries += chains + self._bilateral_pass(now, None)
             return summaries
+
+    def _book(self, now: int) -> Tuple[dict, List[BookOrder]]:
+        rows = self.db.execute(
+            f"""SELECT * FROM orders WHERE status IN {ACTIVE} AND transfer_type IN {MATCHABLE}
+                  AND remaining_amount > 0 AND deadline_at > ?""",
+            (now,),
+        ).fetchall()
+        book = [
+            BookOrder(
+                r["id"], r["from_country"], r["to_country"], r["remaining_amount"], r["created_at"],
+                deadline_at=r["deadline_at"], routable=r["transfer_type"] == "matched_pool",
+                sender=r["sender_address"], recipient=r["recipient_address"],
+            )
+            for r in rows
+        ]
+        return {r["id"]: r for r in rows}, book
+
+    @staticmethod
+    def _side(o: sqlite3.Row) -> dict:
+        return {
+            "publicId": o["public_id"],
+            "senderName": o["sender_name"],
+            "recipientName": o["recipient_name"],
+            "fromCountry": o["from_country"],
+            "toCountry": o["to_country"],
+            "fundingMethod": json.loads(o["funding_method_json"]) if o["funding_method_json"] else None,
+        }
+
+    def _debit_local(self, o: sqlite3.Row, units: int) -> None:
+        """Debit an order's matched-part payment method, in its sender's currency."""
+        if o["bank_id"]:
+            self.accounts.debit(o["bank_id"], units_to_minor(units, o["fx_rate"] or fx_for(o["from_country"])[1]))
+
+    def _insert_fill(self, batch_id, a_id, b_id, amount, method, status, ref, funding_a, funding_b, now) -> None:
+        self.db.execute(
+            """INSERT INTO fills (batch_id, order_a_id, order_b_id, amount, settlement_method, settlement_status,
+                 settlement_ref, funding_a_json, funding_b_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (batch_id, a_id, b_id, amount, method, status, ref, json.dumps(funding_a), json.dumps(funding_b), now),
+        )
+
+    def _apply_matched(self, matched_delta: dict, remaining: dict) -> None:
+        for oid, delta in matched_delta.items():
+            left = remaining[oid]
+            self.db.execute(
+                "UPDATE orders SET matched_amount = matched_amount + ?, remaining_amount = ?, status = ? WHERE id = ?",
+                (delta, left, "settled" if left == 0 else "partially_matched", oid),
+            )
+
+    def _bilateral_pass(self, now: int, pairs: Optional[List[Tuple[str, str]]]) -> list:
+        by_id, book = self._book(now)
+        targets = [pair_key(a, b) for a, b in (pairs if pairs is not None else crossed_pairs(book))]
+        seen: set = set()
+        summaries = []
+        for a, b in targets:
+            if (a, b) in seen:
+                continue
+            seen.add((a, b))
+            result = match_pair(book, a, b)
+            if not result.fills:
+                continue
+            batch_id = f"B{_base36(now)}{secrets.token_hex(2).upper()}"
+            summary = {"batchId": batch_id, "pairId": f"{a}-{b}", "method": "offchain_netting", "fills": [], "totalUnits": 0}
+            matched_delta: dict = {}
+            for index, f in enumerate(result.fills):
+                oa, ob = by_id[f.order_a_id], by_id[f.order_b_id]
+                settled = offchain_netting(batch_id, index, f.amount, self._side(oa), self._side(ob))
+                # Matched part is paid from each order's chosen method: debit it now, in local currency.
+                self._debit_local(oa, f.amount)
+                self._debit_local(ob, f.amount)
+                self._insert_fill(batch_id, oa["id"], ob["id"], f.amount, settled["method"], settled["status"],
+                                  settled["ref"], settled["fundingA"], settled["fundingB"], now)
+                matched_delta[oa["id"]] = matched_delta.get(oa["id"], 0) + f.amount
+                matched_delta[ob["id"]] = matched_delta.get(ob["id"], 0) + f.amount
+                summary["fills"].append({"amountUnits": f.amount, "ref": settled["ref"]})
+                summary["totalUnits"] += f.amount
+            self._apply_matched(matched_delta, result.remaining)
+            for oid, left in result.remaining.items():  # keep the in-memory book in sync for later pairs
+                next(o for o in book if o.id == oid).remaining = left
+            summaries.append(summary)
+        return summaries
+
+    def _chain_pass(self, now: int) -> list:
+        """A -> B + B -> C: B's sender pays A->B's recipient locally in B (debited now), and a routed
+        leg A -> C (A's sender -> C's recipient) is created for the same amount. The routed leg is
+        funded by the A -> B order's payment methods, takes the earlier of the two deadlines, can be
+        matched like any order, and otherwise settles via the Soroban contract when its timer runs out."""
+        by_id, book = self._book(now)
+        result = match_chains(book, now, MIN_ROUTE_WINDOW_MS)
+        if not result.fills:
+            return []
+        batch_id = f"R{_base36(now)}{secrets.token_hex(2).upper()}"
+        summaries: dict = {}
+        matched_delta: dict = {}
+        for index, f in enumerate(result.fills):
+            x, y = by_id[f.inbound_id], by_id[f.outbound_id]
+            deadline = min(x["deadline_at"], y["deadline_at"])
+            cur = self.db.execute(
+                """INSERT INTO orders (public_id, onchain_id, transfer_type, sender_name, sender_address, recipient_name,
+                     recipient_address, from_country, to_country, from_flag, to_flag, amount, remaining_amount, status,
+                     remainder_policy, created_at, deadline_minutes, deadline_at, notes, funding_method_json, account_id,
+                     fiat_currency, fx_rate, bank_id, remainder_bank_id, route_in_order_id, route_out_order_id, route_via)
+                   VALUES (?,?,'routed',?,?,?,?,?,?,?,?,?,?,'open','direct_stellar_fallback',?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    f"RTE-{secrets.token_hex(4).upper()}",
+                    1 + secrets.randbelow(2**47 - 1),
+                    x["sender_name"], x["sender_address"], y["recipient_name"], y["recipient_address"],
+                    x["from_country"], y["to_country"], x["from_flag"], y["to_flag"],
+                    f.amount, f.amount, now, max(1, -(-(deadline - now) // 60_000)), deadline,
+                    f"Routed: {x['from_country']} → {f.hub} and {f.hub} → {y['to_country']} became one {x['from_country']} → {y['to_country']} transfer.",
+                    x["funding_method_json"], x["account_id"], x["fiat_currency"], x["fx_rate"],
+                    x["bank_id"], x["remainder_bank_id"], x["id"], y["id"], f.hub,
+                ),
+            )
+            route = self.get(cur.lastrowid)
+            records = chain_routing(batch_id, index, f.amount, self._side(x), self._side(y), f.hub, route["public_id"])
+            # B's sender pays A->B's recipient now, domestically in B. A's sender pays later, via the routed leg.
+            self._debit_local(y, f.amount)
+            self._insert_fill(batch_id, x["id"], y["id"], f.amount, records["method"], records["status"],
+                              records["ref"], records["fundingA"], records["fundingB"], now)
+            matched_delta[x["id"]] = matched_delta.get(x["id"], 0) + f.amount
+            matched_delta[y["id"]] = matched_delta.get(y["id"], 0) + f.amount
+            key = f"{x['from_country']}-{f.hub}-{y['to_country']}"
+            summ = summaries.setdefault(key, {"batchId": batch_id, "pairId": key, "method": "chain_routing", "fills": [], "totalUnits": 0})
+            summ["fills"].append({"amountUnits": f.amount, "ref": records["ref"]})
+            summ["totalUnits"] += f.amount
+        self._apply_matched(matched_delta, result.remaining)
+        return list(summaries.values())
 
     # ------------------------------------------------ expiry & remainders
 
@@ -276,7 +351,7 @@ class OrderService:
 
     def active_ids_in_pair(self, a: str, b: str) -> List[int]:
         rows = self.db.execute(
-            f"""SELECT id FROM orders WHERE status IN {ACTIVE} AND transfer_type = 'matched_pool' AND
+            f"""SELECT id FROM orders WHERE status IN {ACTIVE} AND transfer_type IN {MATCHABLE} AND
                   ((from_country = ? AND to_country = ?) OR (from_country = ? AND to_country = ?))""",
             (a, b, b, a),
         ).fetchall()
@@ -284,7 +359,7 @@ class OrderService:
 
     def expired_ids(self) -> List[int]:
         rows = self.db.execute(
-            f"""SELECT id FROM orders WHERE status IN {ACTIVE} AND transfer_type = 'matched_pool'
+            f"""SELECT id FROM orders WHERE status IN {ACTIVE} AND transfer_type IN {MATCHABLE}
                   AND remaining_amount > 0 AND deadline_at <= ? ORDER BY deadline_at""",
             (now_ms(),),
         ).fetchall()
