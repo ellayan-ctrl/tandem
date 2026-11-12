@@ -108,7 +108,7 @@
  * @property {string} depositTxHash - Pre-authorization (`approve`) tx hash. No funds move in this tx.
  * @property {number | null} [preauthExpirationLedger]
  * @property {string} [settlementTxHash]
- * @property {string} [fallbackTxHash] - Soroban `payout_remainder` tx hash for the unmatched remainder.
+ * @property {string} [fallbackTxHash] - Soroban `settle_remainder` tx hash for the unmatched remainder.
  * @property {number} [payoutAmount]
  * @property {string} [payoutError]
  * @property {'matched_pool' | 'direct_instant'} [transferType]

@@ -1,7 +1,9 @@
 """Thin Stellar / Soroban RPC client for the on-chain touchpoints, all at a window's expiry:
   1. On-ramp: the treasury sends the unmatched amount of testnet USDC to the user's invisible wallet.
   2. The invisible wallet approves the settlement contract for exactly that amount (SEP-41 approve).
-  3. The operator calls `payout_remainder` on the settlement contract, which pulls it to the recipient.
+  3. The operator calls `settle_remainder` on the settlement contract. The contract itself checks
+     that the window has closed (ledger time >= deadline) and that remainder = total - matched,
+     records the settlement, and pulls exactly the remainder to the recipient.
 """
 from __future__ import annotations
 
@@ -36,13 +38,14 @@ async def close() -> None:
         _server = None
 
 
-CONTRACT_ERRORS = {"#1": "InvalidAmount", "#2": "AlreadyPaid", "#3": "SameAccount"}
+CONTRACT_ERRORS = {"#1": "InvalidAmount", "#2": "AlreadyPaid", "#3": "SameAccount", "#4": "TooEarly", "#5": "Paused"}
 USDC_ASSET = Asset("USDC", config.usdc_issuer)
 
 
-def _explain_sim_error(raw: str) -> ChainError:
+def _explain_sim_error(raw: str, contract_id: Optional[str] = None) -> ChainError:
     m = re.search(r"Error\(Contract, (#\d+)\)", raw)
-    if m and config.settlement_contract_id in raw:
+    # Simulation errors don't always name the contract, so also trust the contract we invoked.
+    if m and (contract_id == config.settlement_contract_id or config.settlement_contract_id in raw):
         name = CONTRACT_ERRORS.get(m.group(1), m.group(1))
         return ChainError(f"Settlement contract rejected the call: {name}", name)
     if re.search(r"trustline|TrustlineMissing|#13", raw):
@@ -76,7 +79,7 @@ async def _simulate_read(contract_id: str, method: str, *args):
     )
     sim = await server().simulate_transaction(tx)
     if sim.error:
-        raise _explain_sim_error(sim.error)
+        raise _explain_sim_error(sim.error, contract_id)
     if not sim.results:
         return None
     return scval.to_native(sim.results[0].xdr)
@@ -84,6 +87,23 @@ async def _simulate_read(contract_id: str, method: str, *args):
 
 async def latest_ledger() -> int:
     return (await server().get_latest_ledger()).sequence
+
+
+async def latest_ledger_time() -> int:
+    """Close time (unix seconds) of the latest ledger: the only clock a contract can see."""
+    seq = await latest_ledger()
+    res = await server().get_ledgers(start_ledger=seq, limit=1)
+    return int(res.ledgers[0].ledger_close_time)
+
+
+async def wait_for_ledger_time(unix_s: int, timeout_s: float = 90) -> None:
+    """Block until the ledger clock reaches `unix_s`. Ledgers close every ~5s, so the ledger
+    clock trails wall time slightly; the contract refuses settlement before the deadline."""
+    deadline = time.monotonic() + timeout_s
+    while await latest_ledger_time() < unix_s:
+        if time.monotonic() > deadline:
+            raise ChainError("Ledger clock has not reached the order deadline yet.", "TooEarly")
+        await asyncio.sleep(2)
 
 
 async def usdc_balance(account: str) -> int:
@@ -97,6 +117,11 @@ async def paid_amount(onchain_id: int) -> Optional[int]:
     return None if v is None else int(v)
 
 
+async def settlement(onchain_id: int) -> Optional[dict]:
+    """The contract's settlement record for an order id (total, matched, remainder, deadline, ...)."""
+    return await _simulate_read(config.settlement_contract_id, "settlement", _u64(onchain_id))
+
+
 async def _prepare(source: str, contract_id: str, method: str, args: list) -> TransactionEnvelope:
     account = await server().load_account(source)
     tx = (
@@ -108,7 +133,7 @@ async def _prepare(source: str, contract_id: str, method: str, args: list) -> Tr
     try:
         return await server().prepare_transaction(tx)
     except PrepareTransactionException as e:
-        raise _explain_sim_error(str(e.simulate_transaction_response.error or e)) from e
+        raise _explain_sim_error(str(e.simulate_transaction_response.error or e), contract_id) from e
 
 
 async def submit_and_wait(tx: TransactionEnvelope) -> dict:
@@ -138,18 +163,25 @@ async def wait_for(tx_hash: str, timeout_s: float = 60) -> dict:
     raise ChainError(f"Timed out waiting for transaction {tx_hash}.", "Timeout")
 
 
-async def payout_remainder(
-    onchain_id: int, from_: str, to: str, amount_units: int, on_signed: Callable[[str], None]
+async def settle_remainder(
+    onchain_id: int,
+    from_: str,
+    to: str,
+    total_units: int,
+    matched_units: int,
+    deadline_s: int,
+    on_signed: Callable[[str], None],
 ) -> dict:
-    """Operator-signed payout of an expired order's remainder.
-    `on_signed` receives the tx hash before submission so the caller can persist it (crash
-    recovery can then look the tx up instead of paying twice; the contract also rejects a
-    second payout for the same order id)."""
+    """Operator-signed settlement of an expired order's unmatched remainder.
+    The contract verifies the deadline and that remainder = total - matched, and moves only the
+    remainder. `on_signed` receives the tx hash before submission so the caller can persist it
+    (crash recovery can then look the tx up instead of paying twice; the contract also rejects a
+    second settlement for the same order id)."""
     tx = await _prepare(
         config.operator.public_key,
         config.settlement_contract_id,
-        "payout_remainder",
-        [_u64(onchain_id), _addr(from_), _addr(to), _i128(amount_units)],
+        "settle_remainder",
+        [_u64(onchain_id), _addr(from_), _addr(to), _i128(total_units), _i128(matched_units), scval.to_uint64(deadline_s)],
     )
     tx.sign(config.operator)
     on_signed(tx.hash_hex())

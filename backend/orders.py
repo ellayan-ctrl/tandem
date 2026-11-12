@@ -308,7 +308,8 @@ class OrderService:
 
     async def resolve(self, order_id: int, action: Optional[str] = None, conversion=None) -> sqlite3.Row:
         """Resolve an order's unmatched remainder:
-          payout:  convert to USDC and pay via the Soroban contract (real testnet USDC),
+          payout:  convert to USDC and settle via the Soroban contract (real testnet USDC; the
+                   contract checks the deadline and that remainder = total - matched),
           release: nothing moves; the money never left the sender,
           convert: simulated fiat conversion (no on-chain movement).
         `action` defaults to the order's remainder policy."""
@@ -358,13 +359,22 @@ class OrderService:
             if cur.rowcount == 0:
                 raise HttpError(409, "Order changed state; try again.")
             try:
+                total, matched = order["amount"], order["matched_amount"]
+                if total - matched != amount:
+                    raise ChainError(f"Order amounts are inconsistent: {total} - {matched} != {amount}.")
+                # The contract refuses to settle before the deadline by the LEDGER clock, so wait for
+                # it before anything touches the chain (on-ramp included).
+                deadline_s = -(-order["deadline_at"] // 1000)  # ceil to whole seconds
+                await chain.wait_for_ledger_time(deadline_s)
                 if order["account_id"]:
                     await self._on_ramp_for_payout(order, amount)
-                res = await chain.payout_remainder(
+                res = await chain.settle_remainder(
                     order["onchain_id"],
                     order["sender_address"],
                     order["recipient_address"],
-                    amount,
+                    total,
+                    matched,
+                    deadline_s,
                     lambda h: self.db.execute("UPDATE orders SET payout_tx_hash = ? WHERE id = ?", (h, oid)),
                 )
                 self._mark_paid(oid, res["hash"], f"Unmatched {format_units(amount)} sent as USDC via Stellar Blockchain (ledger {res['ledger']}).")

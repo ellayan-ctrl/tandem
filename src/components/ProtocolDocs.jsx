@@ -5,7 +5,7 @@ import { SOROBAN_RUST_CONTRACT_CODE, ARCHITECTURE_COMPONENTS } from '../utils/so
 export const ProtocolDocs = () => {
   const [activeSubTab, setActiveSubTab] = useState('overview');
   const [copiedCode, setCopiedCode] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState('payout_remainder');
+  const [selectedMethod, setSelectedMethod] = useState('settle_remainder');
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(SOROBAN_RUST_CONTRACT_CODE);
@@ -18,35 +18,68 @@ export const ProtocolDocs = () => {
       name: '__constructor',
       role: 'Deployer',
       auth: 'None (runs once at deploy)',
-      description: 'Sets the operator (admin) and the USDC Stellar Asset Contract address.',
+      description: 'Sets the operator (admin) and the USDC Stellar Asset Contract address. Settlements start unpaused.',
       signature: 'pub fn __constructor(env: Env, admin: Address, token: Address)',
-      storage: 'Instance Storage: [Admin, Token]',
+      storage: 'Instance Storage: [Admin, Token, Paused]',
     },
     {
       name: 'usdc.approve (SEP-41)',
-      role: 'Sender',
+      role: 'Sender wallet',
       auth: 'sender (tx source)',
       description:
-        'Not part of this contract: the pre-authorization the sender signs on the USDC token when placing an order. Grants this contract an allowance; no funds move.',
+        "Not part of this contract. Signed by the sender's invisible wallet only when the timer runs out, for exactly the unmatched amount, right after that amount is converted to USDC. Nothing is approved while the order is open.",
       signature: 'fn approve(env, from: Address, spender: Address, amount: i128, expiration_ledger: u32)',
       storage: 'USDC token allowance (from -> settlement contract)',
     },
     {
-      name: 'payout_remainder',
+      name: 'settle_remainder',
       role: 'Operator',
       auth: 'admin.require_auth()',
       description:
-        "Pays an expired order's unmatched remainder from sender to recipient with transfer_from. Matched volume never reaches this function.",
-      signature: 'pub fn payout_remainder(env: Env, order_id: u64, from: Address, to: Address, amount: i128) -> Result<(), Error>',
-      storage: 'Persistent Storage: [Paid(order_id)] (blocks double payout), emits remainder_paid',
+        "Settles an expired order's unmatched remainder. The contract itself refuses if the ledger clock is before the deadline (TooEarly), checks remainder = total - matched, records the settlement, then moves only the remainder with transfer_from. Matched volume never moves through this contract.",
+      signature:
+        'pub fn settle_remainder(env: Env, order_id: u64, from: Address, to: Address, total: i128, matched: i128, deadline: u64) -> Result<i128, Error>',
+      storage: 'Persistent: [Paid(order_id), Settlement(order_id)]; Instance: [Stats]; emits RemainderSettled',
+    },
+    {
+      name: 'settlement',
+      role: 'Anyone',
+      auth: 'None (read-only)',
+      description: 'The on-chain record for an order: sender, recipient, total, matched, remainder, deadline, and when it settled.',
+      signature: 'pub fn settlement(env: Env, order_id: u64) -> Option<Settlement>',
+      storage: 'Reads Settlement(order_id)',
     },
     {
       name: 'paid_amount',
       role: 'Anyone',
       auth: 'None (read-only)',
-      description: 'Returns the amount already paid for an order id, if any. Used for crash recovery.',
+      description: 'Returns the remainder already settled for an order id, if any. Used for crash recovery.',
       signature: 'pub fn paid_amount(env: Env, order_id: u64) -> Option<i128>',
       storage: 'Reads Paid(order_id)',
+    },
+    {
+      name: 'stats',
+      role: 'Anyone',
+      auth: 'None (read-only)',
+      description: 'Running totals: number of settlements, total order volume, volume matched off-chain, and volume settled on-chain.',
+      signature: 'pub fn stats(env: Env) -> Stats',
+      storage: 'Reads Stats',
+    },
+    {
+      name: 'pause / unpause',
+      role: 'Operator',
+      auth: 'admin.require_auth()',
+      description: 'Emergency stop for a value-bearing contract: while paused, settle_remainder fails with Paused.',
+      signature: 'pub fn pause(env: Env) / pub fn unpause(env: Env)',
+      storage: 'Instance Storage: [Paused], emits PausedChanged',
+    },
+    {
+      name: 'upgrade',
+      role: 'Operator',
+      auth: 'admin.require_auth()',
+      description: "Replaces the contract's code in place; address, storage and settlement records are kept.",
+      signature: 'pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>)',
+      storage: 'Contract instance code',
     },
   ];
 
