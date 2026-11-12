@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
-  ShieldCheck,
   ArrowRight,
   Clock,
-  Layers,
-  SendHorizontal,
-  RotateCcw,
+  ExternalLink,
+  Printer,
+  Download,
+  ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  Zap,
-  ExternalLink,
+  Copy,
+  Check,
+  Share2,
+  Building2,
+  RefreshCw,
 } from 'lucide-react';
 import { TransferOrder } from '../types';
 
@@ -20,6 +23,8 @@ interface OrderReceiptModalProps {
   onInstantSendRemainder?: (orderId: string) => void;
   onInstantRefundRemainder?: (orderId: string) => void;
   onFastForwardExpiry?: (orderId: string) => void;
+  onOpenConvertRemainder?: (order: TransferOrder) => void;
+  latestLedger?: number;
 }
 
 export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
@@ -28,40 +33,28 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
   onInstantSendRemainder,
   onInstantRefundRemainder,
   onFastForwardExpiry,
+  onOpenConvertRemainder,
+  latestLedger = 48922450,
 }) => {
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Real-time ticking interval
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   if (!order) return null;
 
-  const percentFilled =
-    order.amount > 0 ? (order.matchedAmount / order.amount) * 100 : 0;
+  const percent = order.amount > 0 ? (order.matchedAmount / order.amount) * 100 : 0;
+  const isPending = order.status === 'open' || order.status === 'partially_matched';
+  const remainingMs = Math.max(0, order.deadlineTimestamp - currentTime);
+  const totalDurationMs = Math.max(1, order.deadlineMinutes * 60 * 1000);
+  const countdownPercent = Math.min(100, Math.max(0, (remainingMs / totalDurationMs) * 100));
 
-  const isPending =
-    order.status === 'open' || order.status === 'partially_matched';
-
-  const timeRemainingMs = Math.max(0, order.deadlineTimestamp - currentTime);
-  const totalDurationMs = Math.max(
-    1,
-    order.deadlineMinutes * 60 * 1000
-  );
-  const timeElapsedMs = Math.min(totalDurationMs, totalDurationMs - timeRemainingMs);
-  const countdownPercent = Math.min(
-    100,
-    Math.max(0, (timeRemainingMs / totalDurationMs) * 100)
-  );
-
-  const hours = Math.floor(timeRemainingMs / (1000 * 60 * 60));
-  const minutes = Math.floor((timeRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((timeRemainingMs % (1000 * 60)) / 1000);
-
+  const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+  const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
   const formattedCountdown = `${hours > 0 ? `${hours}h ` : ''}${minutes
     .toString()
     .padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
@@ -73,306 +66,530 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
     second: '2-digit',
   });
 
+  const createdDate = new Date(order.createdAt).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(label);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadJson = () => {
+    const auditData = {
+      title: 'Stellar Settlement Audit & Transfer Receipt',
+      orderId: order.id,
+      timestamp: new Date(order.createdAt).toISOString(),
+      network: 'Stellar Testnet',
+      ledgerSequence: latestLedger,
+      escrowContract: order.escrowContractId,
+      principalCommittedUsdc: order.amount,
+      matchedAmountUsdc: order.matchedAmount,
+      remainingAmountUsdc: order.remainingAmount,
+      route: `${order.fromCountry} -> ${order.toCountry}`,
+      sender: { name: order.senderName, address: order.senderAddress },
+      recipient: { name: order.recipientName, address: order.recipientAddress },
+      remainderPolicy: order.remainderPolicy,
+      status: order.status,
+      depositTxHash: order.depositTxHash,
+      settlementTxHash: order.settlementTxHash || null,
+      fallbackTxHash: order.fallbackTxHash || null,
+      matchHistory: order.matchHistory,
+      feeSavingsUsdc: 45.0,
+      protocolFeeUsdc: 0.0,
+      stellarBaseFeeXlm: 0.00001,
+    };
+
+    const blob = new Blob([JSON.stringify(auditData, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Settlement-Audit-${order.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Layers className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full my-8 overflow-hidden print:border-none print:shadow-none print:w-full print:max-w-none">
+        {/* Audit Header Banner */}
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Transfer Details & Matching Status
-              </h3>
-              <p className="text-xs text-slate-400 font-mono">{order.id}</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Settlement Audit Report & Receipt
+                </h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-semibold">
+                  Testnet Validated
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                Stellar Horizon Ledger #{latestLedger} · Soroban Escrow #{order.escrowContractId}
+              </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handlePrint}
+              className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors print:hidden"
+              title="Print Official Audit Receipt"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleDownloadJson}
+              className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors print:hidden"
+              title="Download JSON Audit Record"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors print:hidden"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-5 text-xs">
-          {/* Corridor & Amount Summary */}
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 text-sm">
-              <span>{order.fromFlag} {order.fromCountry}</span>
-              <ArrowRight className="w-4 h-4 text-indigo-500" />
-              <span>{order.toFlag} {order.toCountry}</span>
-            </div>
-            <div className="text-right">
-              <span className="font-mono-numbers font-bold text-base text-slate-900 dark:text-white block">
-                ${order.amount.toFixed(2)} USDC
-              </span>
-              <span className="text-[10px] text-slate-400">
-                {order.transferType === 'direct_instant' ? 'Direct Transfer' : 'Escrowed Intent'}
-              </span>
-            </div>
-          </div>
-
-          {/* REAL-TIME MATCHING COUNTDOWN TIMER */}
-          {isPending ? (
-            <div className="bg-indigo-50/70 dark:bg-indigo-950/30 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800/60 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600 animate-pulse" />
-                  Live Matching Window Countdown
-                </span>
-                <span className="text-sm font-mono font-bold text-indigo-700 dark:text-indigo-300">
-                  {timeRemainingMs > 0 ? formattedCountdown : '00m 00s (Expired)'}
-                </span>
+        {/* Modal Body */}
+        <div className="p-5 space-y-5 text-xs">
+          {/* Top Status & Core Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+              <span className="text-[11px] text-slate-500 block mb-0.5">Order ID & Status</span>
+              <div className="font-mono font-bold text-slate-900 dark:text-white">
+                {order.id}
               </div>
-
-              {/* Countdown Progress Bar */}
-              <div className="w-full bg-indigo-200/60 dark:bg-indigo-900/40 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-indigo-600 h-full rounded-full transition-all duration-1000"
-                  style={{ width: `${countdownPercent}%` }}
-                />
-              </div>
-
-              <div className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300 pt-0.5">
-                <span>
-                  Expires: <strong className="font-mono-numbers">{formattedDeadlineDate}</strong> ({order.deadlineMinutes}m total)
-                </span>
-                <span className="text-indigo-600 dark:text-indigo-400 font-medium">
-                  {timeRemainingMs > 0 ? 'Searching for peer match...' : 'Deadline reached'}
-                </span>
-              </div>
-
-              {/* What happens at zero */}
-              <div className="text-[11px] bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900 text-slate-600 dark:text-slate-300">
-                <strong className="text-slate-900 dark:text-white block mb-0.5">
-                  Autonomous Policy Trigger:
-                </strong>
-                {order.remainderPolicy === 'direct_stellar_fallback' ? (
-                  <span className="text-emerald-700 dark:text-emerald-400">
-                    ⚡ If unmatched when countdown hits zero, remaining ${order.remainingAmount.toFixed(2)} USDC is automatically dispatched to {order.recipientName} via direct Stellar transfer.
+              <div className="mt-1">
+                {order.status === 'settled' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    <CheckCircle2 className="w-3 h-3" /> 100% Settled & Delivered
                   </span>
-                ) : (
-                  <span className="text-amber-700 dark:text-amber-400">
-                    🔄 If unmatched when countdown hits zero, remaining ${order.remainingAmount.toFixed(2)} USDC is safely refunded back to your wallet.
+                )}
+                {isPending && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                    <Clock className="w-3 h-3" /> In Matching Window
+                  </span>
+                )}
+                {order.status === 'remainder_converted' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                    <CheckCircle2 className="w-3 h-3" /> Remainder Converted to Bank Fiat
+                  </span>
+                )}
+                {order.status === 'fallback_executed' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 font-semibold">
+                    <CheckCircle2 className="w-3 h-3" /> Direct Fallback Dispatched
+                  </span>
+                )}
+                {order.status === 'refunded' && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400 font-semibold">
+                    <CheckCircle2 className="w-3 h-3" /> Refunded to Wallet
                   </span>
                 )}
               </div>
             </div>
-          ) : (
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
-              <span className="text-slate-500">Matching Status:</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {order.status === 'settled' && 'Fully Settled'}
-                {order.status === 'fallback_executed' && 'Direct Fallback Executed'}
-                {order.status === 'refunded' && 'Refund Completed'}
+
+            <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+              <span className="text-[11px] text-slate-500 block mb-0.5">Principal Amount</span>
+              <div className="text-base font-bold font-mono-numbers text-slate-900 dark:text-white">
+                ${order.amount.toFixed(2)} USDC
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono-numbers">
+                Escrowed on Soroban
               </span>
+            </div>
+
+            <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+              <span className="text-[11px] text-slate-500 block mb-0.5">Corridor Route</span>
+              <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>{order.fromFlag} {order.fromCountry}</span>
+                <ArrowRight className="w-3 h-3 text-slate-400" />
+                <span>{order.toFlag} {order.toCountry}</span>
+              </div>
+              <span className="text-[10px] text-slate-400">
+                Created: {createdDate}
+              </span>
+            </div>
+          </div>
+
+          {/* Active Countdown Timer (if pending matching) */}
+          {isPending && (
+            <div className="p-3.5 border border-amber-200 dark:border-amber-900/60 rounded-lg bg-amber-50/40 dark:bg-amber-950/20 space-y-2">
+              <div className="flex justify-between items-baseline">
+                <span className="font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5 text-xs">
+                  <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 animate-pulse" />
+                  Two-Way Matching Window Active
+                </span>
+                <span className="font-mono font-bold text-amber-900 dark:text-amber-200 text-sm">
+                  {remainingMs > 0 ? formattedCountdown : 'Deadline reached - resolving...'}
+                </span>
+              </div>
+
+              <div className="w-full bg-amber-200 dark:bg-amber-950 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-amber-600 dark:bg-amber-400 h-full transition-all duration-1000"
+                  style={{ width: `${countdownPercent}%` }}
+                />
+              </div>
+
+              <div className="flex justify-between text-[11px] text-amber-800 dark:text-amber-300">
+                <span>Closes automatically at {formattedDeadlineDate}</span>
+                <span>
+                  Policy: {order.remainderPolicy === 'direct_stellar_fallback'
+                    ? 'Auto-dispatch remainder directly via Stellar'
+                    : 'Auto-refund remainder to sender wallet'}
+                </span>
+              </div>
             </div>
           )}
 
-          {/* Action Choice: Send Remainder Now or Refund Now */}
-          {isPending && order.remainingAmount > 0 && (
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-              <span className="font-bold text-slate-800 dark:text-slate-200 block">
-                Manage In-Flight Remainder (${order.remainingAmount.toFixed(2)} USDC)
+          {/* Settlement & Netting Audit Breakdown */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+            <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <span className="font-semibold text-slate-900 dark:text-white text-[11px] uppercase tracking-wider">
+                Netting Audit & Settlement Ledger
               </span>
-              <p className="text-[11px] text-slate-500">
-                Don't want to wait for the timer? You can manually trigger settlement or refund right now.
-              </p>
+              <span className="text-[11px] font-mono text-slate-500">
+                {percent.toFixed(0)}% Netted
+              </span>
+            </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="p-4 space-y-3 font-mono-numbers">
+              <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
+                <span className="text-slate-600 dark:text-slate-400">Total USDC Committed to Escrow:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">${order.amount.toFixed(2)} USDC</span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Bilateral Matched (P2P Offset):
+                </span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  ${order.matchedAmount.toFixed(2)} USDC
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  Unmatched Remainder:
+                </span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  ${order.remainingAmount.toFixed(2)} USDC
+                </span>
+              </div>
+
+              {/* Match History Log */}
+              {order.matchHistory && order.matchHistory.length > 0 ? (
+                <div className="mt-3 pt-2">
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1.5 font-sans">
+                    Opposing Peer Match Log:
+                  </span>
+                  <div className="space-y-1.5">
+                    {order.matchHistory.map((rec, i) => (
+                      <div
+                        key={i}
+                        className="p-2 rounded bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-[11px] flex justify-between items-center"
+                      >
+                        <div className="font-sans">
+                          <span className="text-slate-900 dark:text-white font-medium">
+                            Matched with {rec.matchedWithSender}
+                          </span>
+                          <span className="text-slate-400 block font-mono text-[10px]">
+                            {new Date(rec.timestamp).toLocaleTimeString()} · Payout to {rec.recipientSettled}
+                          </span>
+                        </div>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          +${rec.amount.toFixed(2)} USDC
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-800/30 text-slate-500 text-[11px] font-sans flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>
+                    No opposing peer has matched this order yet. If matching occurs, it will automatically offset here.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Remainder Immediate Actions (if order still pending) */}
+          {isPending && order.remainingAmount > 0 && (
+            <div className="p-3.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-800/30 space-y-2.5">
+              <div className="flex justify-between items-baseline">
+                <div>
+                  <span className="font-semibold text-slate-900 dark:text-white text-xs block">
+                    The Rest of the Money (${order.remainingAmount.toFixed(2)} USDC Remaining Unmatched)
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Counterparty matching active. Choose how to resolve the remaining balance right now:
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">1-Click Action</span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
                 {onInstantSendRemainder && (
                   <button
                     type="button"
                     onClick={() => {
                       onInstantSendRemainder(order.id);
-                      onClose();
                     }}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
-                    <SendHorizontal className="w-3.5 h-3.5" />
-                    <span>Send Remainder Now via Direct Stellar</span>
+                    <span>Send the Rest via Direct USDC</span>
                   </button>
                 )}
-
                 {onInstantRefundRemainder && (
                   <button
                     type="button"
                     onClick={() => {
                       onInstantRefundRemainder(order.id);
-                      onClose();
                     }}
-                    className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    className="flex-1 py-2 px-3 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Refund Remainder Now</span>
+                    <span>Refund the Rest to Wallet</span>
                   </button>
                 )}
-
-                {onFastForwardExpiry && timeRemainingMs > 0 && (
+                {onOpenConvertRemainder && (
                   <button
                     type="button"
-                    onClick={() => onFastForwardExpiry(order.id)}
-                    className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 rounded-lg text-[11px] font-medium transition-colors"
-                    title="Simulate timer hitting 00:00 to test policy trigger"
+                    onClick={() => onOpenConvertRemainder(order)}
+                    className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
-                    Fast-Forward Timer (Test)
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Convert Rest to Bank (SEP-31)</span>
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {/* Parties */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">
-                Sender Account
-              </span>
-              <div className="font-semibold text-slate-900 dark:text-white">
-                {order.senderName}
+          {/* Domestic Bank Clearing & Remainder Conversion Receipt */}
+          {order.convertedRemainderFiat && (
+            <div className="p-3.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5 text-xs">
+                  <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  Domestic Bank Clearing & Remainder Conversion Receipt
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-semibold">
+                  Cleared to Bank
+                </span>
               </div>
-              <div className="font-mono text-[11px] text-slate-500 mt-0.5 truncate">
-                {order.senderAddress}
-              </div>
-            </div>
 
-            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">
-                Recipient Account
-              </span>
-              <div className="font-semibold text-slate-900 dark:text-white">
-                {order.recipientName}
-              </div>
-              <div className="font-mono text-[11px] text-slate-500 mt-0.5 truncate">
-                {order.recipientAddress}
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Breakdown */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between font-mono-numbers">
-              <span className="text-slate-500">Filled vs. Remainder:</span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                ${order.matchedAmount.toFixed(2)} / ${order.amount.toFixed(2)} USDC ({percentFilled.toFixed(0)}%)
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-indigo-600 h-full rounded-full transition-all duration-300"
-                style={{ width: `${percentFilled}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[11px] text-slate-400 font-mono-numbers">
-              <span>Matched: ${order.matchedAmount.toFixed(2)}</span>
-              <span>Remaining: ${order.remainingAmount.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Match Fill History */}
-          {order.matchHistory.length > 0 && (
-            <div>
-              <span className="font-semibold text-slate-800 dark:text-slate-200 block mb-2">
-                Settled Match Records
-              </span>
-              <div className="space-y-1.5">
-                {order.matchHistory.map((rec, i) => (
-                  <div
-                    key={i}
-                    className="p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-between font-mono-numbers"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-900 dark:text-white">
-                        Matched with {rec.matchedWithSender}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono truncate max-w-xs">
-                        Tx: {rec.txHash.slice(0, 18)}...
-                      </div>
-                    </div>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      +${rec.amount.toFixed(2)} USDC
-                    </span>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono-numbers">
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Net Fiat Deposited</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {order.convertedRemainderFiat.currency}{' '}
+                    {order.convertedRemainderFiat.fiatAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Applied Anchor FX</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    1 USDC = {order.convertedRemainderFiat.exchangeRate.toFixed(2)}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-1">
+                  <span className="text-slate-400 block text-[10px]">Bank Clearing Ref</span>
+                  <span className="font-mono text-[10px] text-slate-700 dark:text-slate-300 break-all">
+                    {order.convertedRemainderFiat.bankClearingRef}
+                  </span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Cryptographic Hashes with StellarExpert Explorer links */}
-          <div className="space-y-2 font-mono text-[11px] bg-slate-900 text-slate-300 p-3.5 rounded-xl border border-slate-800">
-            <div className="flex justify-between items-center text-slate-400 text-[10px] uppercase font-sans font-semibold pb-1 border-b border-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Stellar Testnet On-Chain Proofs
-              </span>
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          {/* Parties & Addresses */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+              <span className="text-slate-400 text-[11px] block">Sender (Origin Account)</span>
+              <div className="font-semibold text-slate-900 dark:text-white flex items-center justify-between">
+                <span>{order.senderName} ({order.fromCountry})</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(order.senderAddress, 'sender')}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  title="Copy address"
+                >
+                  {copiedKey === 'sender' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
+              <div className="font-mono text-[11px] text-slate-500 break-all select-all">
+                {(() => {
+                  const pub = order.senderAddress.match(/G[A-Z2-7]{55}/)?.[0];
+                  return pub ? (
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/account/${pub}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline flex items-center gap-1 text-slate-600 dark:text-slate-300 group"
+                      title="View account on StellarExpert Testnet"
+                    >
+                      <span>{order.senderAddress}</span>
+                      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white shrink-0" />
+                    </a>
+                  ) : (
+                    <span>{order.senderAddress}</span>
+                  );
+                })()}
+              </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-500 shrink-0">Soroban Escrow:</span>
-              <span className="text-indigo-400 truncate">{order.escrowContractId}</span>
+            <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+              <span className="text-slate-400 text-[11px] block">Recipient (Destination Account)</span>
+              <div className="font-semibold text-slate-900 dark:text-white flex items-center justify-between">
+                <span>{order.recipientName} ({order.toCountry})</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(order.recipientAddress, 'recipient')}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  title="Copy address"
+                >
+                  {copiedKey === 'recipient' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
+              <div className="font-mono text-[11px] text-slate-500 break-all select-all">
+                {(() => {
+                  const pub = order.recipientAddress.match(/G[A-Z2-7]{55}/)?.[0];
+                  return pub ? (
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/account/${pub}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline flex items-center gap-1 text-slate-600 dark:text-slate-300 group"
+                      title="View account on StellarExpert Testnet"
+                    >
+                      <span>{order.recipientAddress}</span>
+                      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white shrink-0" />
+                    </a>
+                  ) : (
+                    <span>{order.recipientAddress}</span>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Fee & Economics Audit */}
+          <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+            <span className="font-semibold text-slate-900 dark:text-white text-xs block">
+              Fee & Capital Efficiency Audit
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono-numbers">
+              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Stellar Gas</span>
+                <span className="font-bold text-slate-900 dark:text-white">0.00001 XLM</span>
+              </div>
+              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Netting Fee</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">$0.00</span>
+              </div>
+              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">SWIFT Fee Avoided</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">~$45.00</span>
+              </div>
+              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Settlement Time</span>
+                <span className="font-bold text-slate-900 dark:text-white">3.8s</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stellar Blockchain Hashes */}
+          <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-mono text-[11px] space-y-2 text-slate-600 dark:text-slate-400">
+            <div className="flex justify-between items-center font-sans font-semibold text-slate-900 dark:text-white text-xs">
+              <span>Cryptographic Proofs (Stellar Testnet Explorer)</span>
+              <span className="text-[10px] text-slate-400 font-mono">Horizon Live</span>
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-500 shrink-0">Deposit Tx:</span>
+            <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-slate-500">Escrow Deposit Tx:</span>
               <a
                 href={`https://stellar.expert/explorer/testnet/tx/${order.depositTxHash.replace('0x', '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-slate-300 hover:text-white hover:underline truncate flex items-center gap-1"
-                title="View on StellarExpert Testnet"
+                className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
               >
-                <span>{order.depositTxHash.slice(0, 24)}...</span>
-                <ExternalLink className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                <span>{order.depositTxHash.slice(0, 18)}...</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
               </a>
             </div>
 
             {order.settlementTxHash && (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-500 shrink-0">Settlement Tx:</span>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">Bilateral Netting Settlement Tx:</span>
                 <a
                   href={`https://stellar.expert/explorer/testnet/tx/${order.settlementTxHash.replace('0x', '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-emerald-400 hover:underline truncate flex items-center gap-1"
-                  title="View Settlement on StellarExpert Testnet"
+                  className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
                 >
-                  <span>{order.settlementTxHash.slice(0, 24)}...</span>
-                  <ExternalLink className="w-2.5 h-2.5 text-emerald-500 shrink-0" />
+                  <span>{order.settlementTxHash.slice(0, 18)}...</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
                 </a>
               </div>
             )}
 
             {order.fallbackTxHash && (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-500 shrink-0">Fallback/Refund:</span>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">
+                  {order.status === 'refunded' ? 'Refund Release Tx:' : 'Direct Fallback Payment Tx:'}
+                </span>
                 <a
                   href={`https://stellar.expert/explorer/testnet/tx/${order.fallbackTxHash.replace('0x', '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-amber-400 hover:underline truncate flex items-center gap-1"
-                  title="View Fallback/Refund on StellarExpert Testnet"
+                  className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
                 >
-                  <span>{order.fallbackTxHash.slice(0, 24)}...</span>
-                  <ExternalLink className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                  <span>{order.fallbackTxHash.slice(0, 18)}...</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
                 </a>
               </div>
             )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 flex items-center justify-end">
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between print:hidden">
+          <button
+            onClick={handleDownloadJson}
+            className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium flex items-center gap-1"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export JSON Audit</span>
+          </button>
+
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 transition-colors"
+            className="px-4 py-2 text-xs font-semibold rounded-md bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 transition-colors shadow-xs"
           >
-            Close
+            Done & View Transfers
           </button>
         </div>
       </div>

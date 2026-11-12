@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeftRight, Wallet, ShieldCheck, RefreshCw } from 'lucide-react';
+import { ArrowLeftRight, Wallet, ShieldCheck, RefreshCw, BookOpen, Building2, Play } from 'lucide-react';
 import { UserWallet } from '../types';
 
 interface HeaderProps {
@@ -9,7 +9,10 @@ interface HeaderProps {
   onFaucetUsdc: () => void;
   activeOrdersCount?: number;
   onOpenWalletModal?: () => void;
+  onOpenBankingModal?: () => void;
+  onOpenDemoModal?: () => void;
   latestLedger?: number;
+  onOpenTour?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,61 +22,56 @@ export const Header: React.FC<HeaderProps> = ({
   onFaucetUsdc,
   activeOrdersCount = 0,
   onOpenWalletModal,
+  onOpenBankingModal,
+  onOpenDemoModal,
   latestLedger,
+  onOpenTour,
 }) => {
   const navTabs = [
-    { id: 'send', label: 'Send Money' },
+    { id: 'send', label: 'Send' },
     { id: 'dashboard', label: 'Transfers', count: activeOrdersCount },
-    { id: 'corridors', label: 'Matching Pools' },
-    { id: 'calculator', label: 'Savings Calculator' },
-    { id: 'docs', label: 'Protocol & Specs' },
+    { id: 'banking', label: 'Bank & On-Ramp' },
+    { id: 'corridors', label: 'Order Book' },
+    { id: 'calculator', label: 'Calculator' },
+    { id: 'docs', label: 'Documentation' },
   ];
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-8 h-16">
-          {/* Zone 1: Single text element wordmark */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-sm">
-              <ArrowLeftRight className="w-4 h-4" />
-            </div>
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('send');
-              }}
-              className="text-lg font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap"
+        <div className="flex items-center justify-between gap-6 h-15">
+          {/* Zone 1: Wordmark */}
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => setActiveTab('send')}
+              className="text-left group flex items-baseline gap-2"
             >
-              TwoWay Stellar
-            </a>
-            <span className="hidden sm:inline-flex text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-              USDC Netting Protocol
-            </span>
+              <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
+                TwoWay
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+                Stellar Clearing
+              </span>
+            </button>
           </div>
 
-          {/* Zone 2: Clean single-line text navigation links */}
-          <nav className="hidden md:flex items-center gap-1 sm:gap-2">
+          {/* Zone 2: Navigation Links */}
+          <nav data-tour="nav-tabs" className="hidden md:flex items-center gap-1">
             {navTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap inline-flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap inline-flex items-center gap-1.5 ${
                     isActive
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <span>{tab.label}</span>
                   {tab.count !== undefined && tab.count > 0 && (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                      isActive
-                        ? 'bg-indigo-500 text-white dark:bg-indigo-600'
-                        : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
-                    }`}>
+                    <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200">
                       {tab.count}
                     </span>
                   )}
@@ -82,36 +80,66 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          {/* Zone 3: 1 primary action / wallet context */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Zone 3: Wallet & Network */}
+          <div data-tour="wallet-console" className="flex items-center gap-2 shrink-0">
+            {onOpenDemoModal && (
+              <button
+                onClick={onOpenDemoModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
+                title="Run Live 2-Institution Netting Demo on Stellar Testnet (10 vs 6 USDC -> 4 USDC Net)"
+              >
+                <Play className="w-3 h-3 fill-current shrink-0" />
+                <span>Run Demo</span>
+              </button>
+            )}
+
+            {onOpenTour && (
+              <button
+                onClick={onOpenTour}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 font-medium transition-colors"
+                title="Open interactive guide"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Guide</span>
+              </button>
+            )}
+
+            {onOpenBankingModal && (
+              <button
+                onClick={onOpenBankingModal}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-xs text-left transition-colors"
+                title="Connected Banking System & Fiat On/Off-Ramp"
+              >
+                <Building2 className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="hidden sm:inline font-medium text-slate-700 dark:text-slate-300">
+                  Bank Hub
+                </span>
+              </button>
+            )}
+
             <button
               onClick={onOpenWalletModal}
-              title="Open Stellar Testnet Wallet Console & Friendbot Faucet"
-              className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-xs text-left transition-colors"
+              title="Open Testnet Wallet Console"
             >
-              <Wallet className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono-numbers font-semibold text-slate-900 dark:text-slate-100">
-                  ${wallet.usdcBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
-                <span className="text-slate-400 font-medium text-[11px]">USDC</span>
-              </div>
+              <span className="text-[11px] text-slate-400 font-medium">USDC</span>
+              <span className="font-mono-numbers font-semibold text-slate-900 dark:text-white">
+                ${wallet.usdcBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
             </button>
 
             <button
               onClick={onOpenWalletModal}
-              title="View on Stellar Testnet Explorer"
-              className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-2.5 py-1.5 rounded-md transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+              title="Stellar Testnet Account"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-semibold text-slate-700 dark:text-slate-300">Testnet</span>
-              <span className="text-slate-300 dark:text-slate-600">·</span>
-              <span className="font-mono-numbers">{wallet.shortAddress}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="font-mono-numbers text-[11px]">{wallet.shortAddress}</span>
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation bar */}
+        {/* Mobile Nav */}
         <div className="flex md:hidden overflow-x-auto py-2 gap-1 border-t border-slate-100 dark:border-slate-800">
           {navTabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -119,10 +147,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1 text-xs font-medium rounded-md whitespace-nowrap shrink-0 transition-colors ${
+                className={`px-2.5 py-1 text-xs font-medium rounded whitespace-nowrap shrink-0 transition-colors ${
                   isActive
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
                 {tab.label}

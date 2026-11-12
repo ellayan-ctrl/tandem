@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import {
   ArrowRight,
   Clock,
-  RotateCcw,
   SendHorizontal,
-  Info,
-  CheckCircle2,
-  Lock,
-  Layers,
-  Zap,
+  RotateCcw,
+  Check,
+  ChevronDown,
+  Building2,
+  Smartphone,
+  ShieldCheck,
 } from 'lucide-react';
 import { Corridor, RemainderPolicy, TransferOrder, UserWallet } from '../types';
+import { isValidStellarPublicKey } from '../services/stellarTestnet';
 
 interface SendTransferFormProps {
   corridors: Corridor[];
@@ -29,85 +30,74 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
   const [directionReversed, setDirectionReversed] = useState<boolean>(false);
   const [amount, setAmount] = useState<string>('500');
   const [recipientName, setRecipientName] = useState<string>('David Kilonzo');
-  const [recipientAddress, setRecipientAddress] = useState<string>('GDAV4908...ID99');
+  const [recipientAddress, setRecipientAddress] = useState<string>(
+    'GAHVEV3PTFCTWHX2DTZZU3F5ZQXBKJUBA4PORGCUIFUJV2RCQAMAQ363'
+  );
 
-  // Choice to send: Matched pool vs Instant Direct
+  // Mode: Matched corridor pool vs instant direct
   const [transferMode, setTransferMode] = useState<'matched_pool' | 'direct_instant'>('matched_pool');
 
-  // Time Selection / Expiry input
-  const [expiryType, setExpiryType] = useState<'preset' | 'custom'>('preset');
+  // Deadline selection
   const [deadlineMinutes, setDeadlineMinutes] = useState<number>(60);
+  const [isCustomDeadline, setIsCustomDeadline] = useState<boolean>(false);
   const [customMinutesInput, setCustomMinutesInput] = useState<string>('45');
 
-  // Remainder Policy choice
+  // Remainder Policy
   const [remainderPolicy, setRemainderPolicy] =
     useState<RemainderPolicy>('direct_stellar_fallback');
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
-  const [createdOrderSummary, setCreatedOrderSummary] = useState<TransferOrder | null>(null);
+  const [submittedOrder, setSubmittedOrder] = useState<TransferOrder | null>(null);
+
+  const [formError, setFormError] = useState<string | null>(null);
 
   const activeCorridor =
     corridors.find((c) => c.id === selectedCorridorId) || corridors[0];
 
-  const fromCountry = directionReversed
-    ? activeCorridor.countryB
-    : activeCorridor.countryA;
-  const toCountry = directionReversed
-    ? activeCorridor.countryA
-    : activeCorridor.countryB;
+  const fromCountry = directionReversed ? activeCorridor.countryB : activeCorridor.countryA;
+  const toCountry = directionReversed ? activeCorridor.countryA : activeCorridor.countryB;
 
   const parsedAmount = parseFloat(amount) || 0;
-  const estimatedAnchorSavings = (
-    parsedAmount *
-    (activeCorridor.offRampSavingsPct / 100)
-  ).toFixed(2);
-  const traditionalFee = (15 + parsedAmount * 0.035).toFixed(2);
-
-  // Compute actual expiry duration in minutes
   const effectiveMinutes =
     transferMode === 'direct_instant'
       ? 0
-      : expiryType === 'custom'
+      : isCustomDeadline
       ? Math.max(1, parseInt(customMinutesInput) || 1)
       : deadlineMinutes;
 
-  // Calculate target expiry time formatted nicely
-  const calculatedExpiryDate = new Date(Date.now() + effectiveMinutes * 60 * 1000);
-  const formattedExpiryTime = calculatedExpiryDate.toLocaleTimeString([], {
+  const expiryDate = new Date(Date.now() + effectiveMinutes * 60 * 1000);
+  const formattedExpiryTime = expiryDate.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   });
 
-  const handleQuickAmount = (val: number) => {
-    setAmount(val.toString());
-  };
-
-  const handlePreFillRecipient = (name: string, addr: string) => {
-    setRecipientName(name);
-    setRecipientAddress(addr);
-  };
+  const estimatedSavings = (parsedAmount * (activeCorridor.offRampSavingsPct / 100)).toFixed(2);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (parsedAmount <= 0) return;
     if (parsedAmount > wallet.usdcBalance) {
-      alert('Amount exceeds your current testnet USDC wallet balance.');
+      setFormError('Amount exceeds your current testnet USDC balance.');
+      return;
+    }
+
+    const cleanRecipient = recipientAddress.trim();
+    if (!isValidStellarPublicKey(cleanRecipient)) {
+      setFormError('Invalid Stellar recipient address. Must be a valid 56-character Ed25519 public key starting with G.');
       return;
     }
 
     setIsSubmitting(true);
 
     setTimeout(() => {
-      const orderId = `ORD-${Date.now().toString().slice(-6)}`;
       const isInstant = transferMode === 'direct_instant';
-
       const newOrder: TransferOrder = {
-        id: orderId,
-        senderName: 'You (Current User)',
-        senderAddress: wallet.shortAddress,
-        recipientName: recipientName.trim() || 'Designated Recipient',
-        recipientAddress: recipientAddress.trim() || 'GABC...9999',
+        id: `ORD-${Date.now().toString().slice(-6)}`,
+        senderName: 'You',
+        senderAddress: wallet.publicKey,
+        recipientName: recipientName.trim() || 'Recipient',
+        recipientAddress: cleanRecipient,
         fromCountry: fromCountry.name,
         toCountry: toCountry.name,
         fromFlag: fromCountry.flag,
@@ -118,9 +108,7 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
         status: isInstant ? 'settled' : 'open',
         createdAt: Date.now(),
         deadlineMinutes: effectiveMinutes,
-        deadlineTimestamp: isInstant
-          ? Date.now()
-          : Date.now() + effectiveMinutes * 60 * 1000,
+        deadlineTimestamp: isInstant ? Date.now() : Date.now() + effectiveMinutes * 60 * 1000,
         remainderPolicy,
         transferType: transferMode,
         matchHistory: isInstant
@@ -131,431 +119,316 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                 amount: parsedAmount,
                 timestamp: Date.now(),
                 recipientSettled: recipientName,
-                txHash: `0x${Array.from({ length: 64 }, () =>
+                txHash: Array.from({ length: 64 }, () =>
                   Math.floor(Math.random() * 16).toString(16)
-                ).join('')}`,
+                ).join(''),
               },
             ]
           : [],
         escrowContractId: isInstant ? 'NATIVE-STELLAR-PAYMENT' : 'CC7X...2WAY',
-        depositTxHash: `0x${Array.from({ length: 64 }, () =>
-          Math.floor(Math.random() * 16).toString(16)
-        ).join('')}`,
-        settlementTxHash: isInstant
-          ? `0x${Array.from({ length: 64 }, () =>
-              Math.floor(Math.random() * 16).toString(16)
-            ).join('')}`
-          : undefined,
+        depositTxHash: '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242',
         notes: isInstant
-          ? `Instant direct Stellar USDC transfer to ${toCountry.name}`
-          : `Matched pool transfer from ${fromCountry.name} to ${toCountry.name} (Deadline: ${effectiveMinutes} mins)`,
+          ? `Direct transfer to ${toCountry.name}`
+          : `Corridor transfer ${fromCountry.name} to ${toCountry.name} (${effectiveMinutes}m window)`,
       };
 
       onOrderCreated(newOrder);
-      setCreatedOrderSummary(newOrder);
+      setSubmittedOrder(newOrder);
       setIsSubmitting(false);
-      setSubmitSuccess(true);
+      // Auto-redirect to Transfers dashboard as requested
+      setTimeout(() => {
+        onNavigateToDashboard();
+      }, 400);
     }, 600);
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
+    <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Send Cross-Border USDC
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Send Money
         </h1>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-          Choose whether to send instantly via direct Stellar transfer or enter the two-way matching pool to save on destination off-ramp fees.
+        <p className="mt-1 text-xs text-slate-500">
+          Match opposite-direction transfers on Stellar to reduce recipient cash-out costs.
         </p>
       </div>
 
-      {submitSuccess && createdOrderSummary ? (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-emerald-200 dark:border-emerald-800/80 p-5 shadow-xs mb-8 animate-fadeIn">
-          <div className="flex items-start gap-4">
-            <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {createdOrderSummary.transferType === 'direct_instant'
-                  ? 'Direct Stellar Payment Dispatched'
-                  : 'Transfer Intent Escrowed On-Chain'}
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                <span className="font-semibold">${createdOrderSummary.amount.toFixed(2)} USDC</span> to{' '}
-                <span className="font-semibold">{createdOrderSummary.recipientName}</span> ({createdOrderSummary.toCountry}).
-                Order ID: <code className="font-mono text-indigo-600 dark:text-indigo-400">{createdOrderSummary.id}</code>
+      {/* Success Notification */}
+      {submittedOrder && (
+        <div className="mb-6 p-4 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-white block">
+                {submittedOrder.transferType === 'direct_instant'
+                  ? 'Transfer Submitted'
+                  : 'Order Placed in Matching Queue'}
+              </span>
+              <p className="text-slate-600 dark:text-slate-400 mt-0.5">
+                ${submittedOrder.amount.toFixed(2)} USDC to {submittedOrder.recipientName} ({submittedOrder.toCountry}) · Order {submittedOrder.id}
               </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 my-3.5 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Corridor</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {createdOrderSummary.fromFlag} {createdOrderSummary.fromCountry} → {createdOrderSummary.toFlag} {createdOrderSummary.toCountry}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Matching Deadline</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {createdOrderSummary.transferType === 'direct_instant'
-                      ? 'Instant (Immediate Settlement)'
-                      : `${createdOrderSummary.deadlineMinutes} minutes`}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Remainder Policy</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {createdOrderSummary.transferType === 'direct_instant'
-                      ? 'Direct Payout'
-                      : createdOrderSummary.remainderPolicy === 'direct_stellar_fallback'
-                      ? 'Auto-Send Remainder via Direct Stellar'
-                      : 'Refund to Wallet'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onNavigateToDashboard}
-                  className="px-3.5 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors inline-flex items-center gap-1.5"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  View in Transfers Dashboard
-                </button>
-                <button
-                  onClick={() => {
-                    setSubmitSuccess(false);
-                    setCreatedOrderSummary(null);
-                  }}
-                  className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Create Another Transfer
-                </button>
-              </div>
             </div>
+            <button
+              onClick={onNavigateToDashboard}
+              className="text-slate-900 dark:text-white font-semibold underline hover:no-underline ml-4"
+            >
+              View in Transfers
+            </button>
           </div>
         </div>
-      ) : null}
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Main Form Box */}
-        <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-xs">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Transfer Choice: Matching Pool vs Instant */}
+      {/* Main Form */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Method Segmented Control */}
+        <div data-tour="transfer-mode" className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setTransferMode('matched_pool')}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors text-center ${
+              transferMode === 'matched_pool'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            }`}
+          >
+            Corridor Netting (Save ~{activeCorridor.offRampSavingsPct}%)
+          </button>
+          <button
+            type="button"
+            onClick={() => setTransferMode('direct_instant')}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors text-center ${
+              transferMode === 'direct_instant'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            }`}
+          >
+            Direct Stellar (Immediate)
+          </button>
+        </div>
+
+        {/* Currency & Corridor Box */}
+        <div data-tour="corridor-route" className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4 bg-white dark:bg-slate-800/60">
+          {/* Corridor Selection */}
+          <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-700">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
-                1. Transfer Method
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setTransferMode('matched_pool')}
-                  className={`p-3.5 rounded-lg border text-left transition-all ${
-                    transferMode === 'matched_pool'
-                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 ring-1 ring-indigo-600'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                      Matching Pool (Save Fees)
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
-                      -{activeCorridor.offRampSavingsPct}% Fees
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                    Pairs with opposing transfers. If unmatched by your deadline, auto-executes your chosen fallback.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTransferMode('direct_instant')}
-                  className={`p-3.5 rounded-lg border text-left transition-all ${
-                    transferMode === 'direct_instant'
-                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 ring-1 ring-indigo-600'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-amber-500" />
-                      Direct Stellar (Instant)
-                    </span>
-                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
-                      3-5 Seconds
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                    Dispatches immediately via native Stellar PaymentOp. No waiting window, standard off-ramp applies.
-                  </p>
-                </button>
+              <span className="text-[11px] text-slate-500 block">Corridor</span>
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
+                <span>{fromCountry.flag} {fromCountry.name}</span>
+                <span className="text-slate-400">→</span>
+                <span>{toCountry.flag} {toCountry.name}</span>
               </div>
             </div>
 
-            {/* Corridor Selection */}
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
-                2. Select Corridor
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {corridors.map((corridor) => {
-                  const isSelected = corridor.id === selectedCorridorId;
-                  return (
-                    <button
-                      key={corridor.id}
-                      type="button"
-                      onClick={() => setSelectedCorridorId(corridor.id)}
-                      className={`text-left p-3 rounded-lg border transition-all ${
-                        isSelected
-                          ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 ring-1 ring-indigo-600'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          <span>{corridor.countryA.flag}</span>
-                          <span>{corridor.countryA.name}</span>
-                          <span className="text-slate-400">⇄</span>
-                          <span>{corridor.countryB.flag}</span>
-                          <span>{corridor.countryB.name}</span>
-                        </span>
-                        <span className="text-[11px] font-mono-numbers text-emerald-600 font-medium">
-                          -{corridor.offRampSavingsPct}%
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                        {corridor.countryA.currency} ↔ {corridor.countryB.currency} · {corridor.countryB.anchorName}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedCorridorId}
+                onChange={(e) => setSelectedCorridorId(e.target.value)}
+                className="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 font-medium"
+              >
+                {corridors.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.countryA.name} ⇄ {c.countryB.name}
+                  </option>
+                ))}
+              </select>
 
-            {/* Direction Route */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2.5 font-medium text-slate-800 dark:text-slate-200">
-                <span className="flex items-center gap-1">
-                  <span>{fromCountry.flag}</span>
-                  <span className="font-bold">{fromCountry.name}</span>
-                </span>
-                <ArrowRight className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="flex items-center gap-1">
-                  <span>{toCountry.flag}</span>
-                  <span className="font-bold">{toCountry.name}</span>
-                </span>
-              </div>
               <button
                 type="button"
                 onClick={() => setDirectionReversed(!directionReversed)}
-                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                title="Reverse corridor direction"
               >
-                Switch Direction
+                Reverse
+              </button>
+            </div>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <div className="flex justify-between items-baseline mb-1">
+              <label className="text-[11px] font-medium text-slate-500">You send</label>
+              <span className="text-[11px] text-slate-400">
+                Balance: <strong className="font-mono-numbers text-slate-700 dark:text-slate-300">${wallet.usdcBalance.toFixed(2)}</strong> USDC
+              </span>
+            </div>
+
+            <div className="relative">
+              <input
+                type="number"
+                min="1"
+                step="any"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full text-xl font-bold font-mono-numbers bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-slate-400"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                USDC
+              </span>
+            </div>
+
+            {/* Quick preset buttons */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-[11px] text-slate-400 mr-1">Preset:</span>
+              {[100, 250, 500, 1000].map((val) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setAmount(val.toString())}
+                  className="px-2 py-0.5 text-xs rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-mono-numbers transition-colors"
+                >
+                  ${val}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Recipient Details */}
+        <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3 bg-white dark:bg-slate-800/60 text-xs">
+          <div className="flex justify-between items-baseline">
+            <span className="font-semibold text-slate-900 dark:text-white">
+              Recipient in {toCountry.name}
+            </span>
+            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+              <span>Sample:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecipientName('David Kilonzo');
+                  setRecipientAddress('GAHVEV3PTFCTWHX2DTZZU3F5ZQXBKJUBA4PORGCUIFUJV2RCQAMAQ363');
+                }}
+                className="text-slate-600 dark:text-slate-400 hover:underline"
+              >
+                David (KE)
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecipientName('Emily Watson');
+                  setRecipientAddress('GBKHAYYPLGZXT7OR6DLHKUKEC6OKYHRQARLUUZH6S3YLUVCG2S5BJXAD');
+                }}
+                className="text-slate-600 dark:text-slate-400 hover:underline"
+              >
+                Emily (CA)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-slate-500 block mb-1">Full Name</label>
+              <input
+                type="text"
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                placeholder="Recipient Name"
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white focus:outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-500 block mb-1">Stellar Address</label>
+              <input
+                type="text"
+                value={recipientAddress}
+                onChange={(e) => setRecipientAddress(e.target.value)}
+                placeholder="G..."
+                className="w-full px-2.5 py-1.5 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white focus:outline-none"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Matching Window (only when in matching mode) */}
+        {transferMode === 'matched_pool' && (
+          <div data-tour="matching-window" className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3 bg-white dark:bg-slate-800/60 text-xs">
+            <div className="flex justify-between items-baseline">
+              <label className="font-semibold text-slate-900 dark:text-white">
+                Matching Window
+              </label>
+              <span className="text-slate-500 font-mono-numbers">
+                Closes at {formattedExpiryTime} ({effectiveMinutes}m)
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: '15m', minutes: 15 },
+                { label: '30m', minutes: 30 },
+                { label: '1h', minutes: 60 },
+                { label: '2h', minutes: 120 },
+                { label: '6h', minutes: 360 },
+                { label: '24h', minutes: 1440 },
+              ].map((item) => {
+                const isSelected = !isCustomDeadline && deadlineMinutes === item.minutes;
+                return (
+                  <button
+                    key={item.minutes}
+                    type="button"
+                    onClick={() => {
+                      setIsCustomDeadline(false);
+                      setDeadlineMinutes(item.minutes);
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                      isSelected
+                        ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => setIsCustomDeadline(true)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  isCustomDeadline
+                    ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                }`}
+              >
+                Custom
               </button>
             </div>
 
-            {/* Amount Input */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  3. Amount (USDC)
-                </label>
-                <span className="text-xs text-slate-500">
-                  Wallet: <span className="font-mono-numbers font-medium text-slate-800 dark:text-slate-200">${wallet.usdcBalance.toFixed(2)}</span> USDC
-                </span>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-semibold text-sm">
-                  $
-                </div>
+            {isCustomDeadline && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-slate-500">Wait up to:</span>
                 <input
                   type="number"
                   min="1"
-                  step="any"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-8 pr-16 py-2.5 text-sm font-mono-numbers font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  required
+                  max="1440"
+                  value={customMinutesInput}
+                  onChange={(e) => setCustomMinutesInput(e.target.value)}
+                  className="w-20 px-2 py-1 text-xs font-mono font-medium border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900"
                 />
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-xs font-bold text-slate-400">
-                  USDC
-                </div>
-              </div>
-
-              {/* Quick Amount Chips */}
-              <div className="flex items-center gap-1.5 mt-2">
-                <span className="text-[11px] text-slate-400 mr-1">Quick:</span>
-                {[100, 200, 300, 500, 1000].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => handleQuickAmount(preset)}
-                    className="px-2 py-0.5 text-xs rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-mono-numbers"
-                  >
-                    ${preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Recipient Details */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  4. Recipient in {toCountry.name}
-                </label>
-                <div className="flex items-center gap-1 text-[11px]">
-                  <span className="text-slate-400">Sample:</span>
-                  <button
-                    type="button"
-                    onClick={() => handlePreFillRecipient('David Kilonzo', 'GDAV4908...ID99')}
-                    className="text-indigo-600 hover:underline"
-                  >
-                    David (KE)
-                  </button>
-                  <span className="text-slate-300">·</span>
-                  <button
-                    type="button"
-                    onClick={() => handlePreFillRecipient('Emily Watson', 'GEMI1120...LY11')}
-                    className="text-indigo-600 hover:underline"
-                  >
-                    Emily (CA)
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-slate-500 block mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    value={recipientName}
-                    onChange={(e) => setRecipientName(e.target.value)}
-                    placeholder="Recipient Name"
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-slate-500 block mb-1">Stellar Address</label>
-                  <input
-                    type="text"
-                    value={recipientAddress}
-                    onChange={(e) => setRecipientAddress(e.target.value)}
-                    placeholder="G... or federation"
-                    className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Time-Selection Input & Matching Deadline (when in matching pool mode) */}
-            {transferMode === 'matched_pool' && (
-              <div className="space-y-3 pt-1 border-t border-slate-100 dark:border-slate-700/80">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                    5. Matching Deadline (How long to wait for peer match)
-                  </label>
-                  <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 font-mono-numbers">
-                    {effectiveMinutes >= 60 ? `${(effectiveMinutes / 60).toFixed(1)} hrs` : `${effectiveMinutes} mins`}
-                  </span>
-                </div>
-
-                {/* Presets & Custom Toggle */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { label: '15 Mins', minutes: 15 },
-                    { label: '30 Mins', minutes: 30 },
-                    { label: '1 Hour', minutes: 60 },
-                    { label: '2 Hours', minutes: 120 },
-                    { label: '6 Hours', minutes: 360 },
-                    { label: '24 Hours', minutes: 1440 },
-                  ].map((p) => {
-                    const isSelected = expiryType === 'preset' && deadlineMinutes === p.minutes;
-                    return (
-                      <button
-                        key={p.minutes}
-                        type="button"
-                        onClick={() => {
-                          setExpiryType('preset');
-                          setDeadlineMinutes(p.minutes);
-                        }}
-                        className={`p-2 rounded-lg border text-xs font-medium transition-all ${
-                          isSelected
-                            ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-900 dark:text-indigo-200 ring-1 ring-indigo-600'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
-
-                  {/* Custom Expiry Button */}
-                  <button
-                    type="button"
-                    onClick={() => setExpiryType('custom')}
-                    className={`col-span-2 p-2 rounded-lg border text-xs font-medium transition-all ${
-                      expiryType === 'custom'
-                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-900 dark:text-indigo-200 ring-1 ring-indigo-600'
-                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    Custom Minutes...
-                  </button>
-                </div>
-
-                {/* Custom Time Input Field */}
-                {expiryType === 'custom' && (
-                  <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-3">
-                    <span className="text-xs text-slate-600 dark:text-slate-300 shrink-0">
-                      Set exact waiting duration:
-                    </span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="2880"
-                      value={customMinutesInput}
-                      onChange={(e) => setCustomMinutesInput(e.target.value)}
-                      placeholder="Minutes"
-                      className="w-24 px-2.5 py-1 text-xs font-mono font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-slate-900 dark:text-white"
-                    />
-                    <span className="text-xs text-slate-500">minutes</span>
-                  </div>
-                )}
-
-                {/* Expiry Timestamp Preview */}
-                <div className="bg-slate-50 dark:bg-slate-900/50 px-3 py-2 rounded-lg text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
-                  <span>Order will expire at:</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-200 font-mono-numbers">
-                    {formattedExpiryTime} today ({effectiveMinutes} min timer)
-                  </span>
-                </div>
+                <span className="text-slate-500">minutes</span>
               </div>
             )}
 
-            {/* Remainder Policy Selection (when in matching pool mode) */}
-            {transferMode === 'matched_pool' && (
-              <div className="space-y-2.5 pt-1 border-t border-slate-100 dark:border-slate-700/80">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
-                  6. If not 100% matched when timer ends:
-                </label>
+            {/* Remainder preference: What to do with the Rest of the Money */}
+            <div data-tour="remainder-policy" className="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2.5">
+              <div className="flex justify-between items-baseline">
+                <span className="font-semibold text-slate-900 dark:text-white block text-xs">
+                  What to do with the Rest of the Money if unmatched?
+                </span>
+                <span className="text-[10px] text-slate-400">Automatic fallback rule</span>
+              </div>
 
-                {/* Option 1: Direct Stellar Fallback */}
-                <label
+              <div className="grid grid-cols-1 gap-2">
+                {/* Option 1: Send the Rest via USDC */}
+                <div
                   onClick={() => setRemainderPolicy('direct_stellar_fallback')}
-                  className={`block p-3 rounded-lg border cursor-pointer transition-all ${
+                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     remainderPolicy === 'direct_stellar_fallback'
-                      ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 ring-1 ring-indigo-600'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900'
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
@@ -564,32 +437,32 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                       name="remainderPolicy"
                       checked={remainderPolicy === 'direct_stellar_fallback'}
                       onChange={() => setRemainderPolicy('direct_stellar_fallback')}
-                      className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                      className="mt-0.5 text-emerald-600 focus:ring-0"
                     />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          <SendHorizontal className="w-3.5 h-3.5 text-indigo-600" />
-                          Auto-Send Remainder via Direct Stellar Transfer (Recommended)
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                          <SendHorizontal className="w-3.5 h-3.5 text-emerald-500" />
+                          Send the Rest via Direct Stellar USDC
                         </span>
-                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-semibold">
                           Guaranteed Delivery
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                        If no opposing transfer fills the remainder by {formattedExpiryTime}, the smart contract automatically sends the rest directly to {recipientName}. Zero delay, transfer is always completed.
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        If counterparty demand doesn't match 100%, immediately dispatch the rest directly to {recipientName} on Stellar. Recipient receives full funds.
                       </p>
                     </div>
                   </div>
-                </label>
+                </div>
 
-                {/* Option 2: Refund to Wallet */}
-                <label
+                {/* Option 2: Refund the Rest to Wallet */}
+                <div
                   onClick={() => setRemainderPolicy('refund_to_sender')}
-                  className={`block p-3 rounded-lg border cursor-pointer transition-all ${
+                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     remainderPolicy === 'refund_to_sender'
-                      ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 ring-1 ring-indigo-600'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      ? 'border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900'
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
@@ -598,105 +471,104 @@ export const SendTransferForm: React.FC<SendTransferFormProps> = ({
                       name="remainderPolicy"
                       checked={remainderPolicy === 'refund_to_sender'}
                       onChange={() => setRemainderPolicy('refund_to_sender')}
-                      className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                      className="mt-0.5 text-indigo-600 focus:ring-0"
                     />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
-                          Refund Remainder Back to My Wallet
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                          <RotateCcw className="w-3.5 h-3.5 text-indigo-500" />
+                          Refund the Rest to My Wallet
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
-                          Capital Preserved
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-semibold">
+                          Zero Risk
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                        If no opposing match is found by {formattedExpiryTime}, the contract returns the remaining USDC to your balance.
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Only execute what matched. If unmatched when the timer closes, unlock and return the remaining USDC back to your wallet.
                       </p>
                     </div>
                   </div>
-                </label>
-              </div>
-            )}
+                </div>
 
-            {/* Submit Button */}
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isSubmitting || parsedAmount <= 0}
-                className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Signing On-Chain Transaction...</span>
-                  </>
-                ) : transferMode === 'direct_instant' ? (
-                  <>
-                    <Zap className="w-4 h-4 text-amber-300" />
-                    <span>Send ${parsedAmount.toFixed(2)} USDC Instantly</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4" />
-                    <span>
-                      Escrow ${parsedAmount.toFixed(2)} USDC ({effectiveMinutes}m Matching Window)
-                    </span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Right Info Sidebar */}
-        <div className="lg:col-span-4 space-y-4 text-xs">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-xs">
-            <h3 className="font-bold text-slate-900 dark:text-white mb-3">
-              Fee & Routing Summary
-            </h3>
-
-            <div className="space-y-2.5">
-              <div className="flex justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
-                <span className="text-slate-500">Amount:</span>
-                <span className="font-mono-numbers font-bold text-slate-900 dark:text-white">
-                  ${parsedAmount.toFixed(2)} USDC
-                </span>
-              </div>
-              <div className="flex justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
-                <span className="text-slate-500">Traditional Bank Wire:</span>
-                <span className="font-mono-numbers text-rose-500 line-through">
-                  ~${traditionalFee}
-                </span>
-              </div>
-              <div className="flex justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
-                <span className="text-slate-500">Stellar Network Fee:</span>
-                <span className="font-mono-numbers text-emerald-600 font-medium">
-                  $0.00002
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Matching Platform Fee:</span>
-                <span className="font-mono-numbers text-indigo-600 font-bold">
-                  $0.00
-                </span>
+                {/* Option 3: Convert Rest to Bank / Mobile Money */}
+                <div
+                  onClick={() => setRemainderPolicy('convert_to_fiat_bank')}
+                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                    remainderPolicy === 'convert_to_fiat_bank'
+                      ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="remainderPolicy"
+                      checked={remainderPolicy === 'convert_to_fiat_bank'}
+                      onChange={() => setRemainderPolicy('convert_to_fiat_bank')}
+                      className="mt-0.5 text-amber-600 focus:ring-0"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                          Convert Rest to Recipient's Bank / M-Pesa ({toCountry.currency})
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-semibold">
+                          SEP-31 Anchor
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Automatically convert the remaining USDC at live Anchor rates and deposit directly into recipient's domestic checking account or mobile money.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            {transferMode === 'matched_pool' && (
-              <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800/60 text-[11px] text-emerald-800 dark:text-emerald-200">
-                <span className="font-bold block">Estimated Local Off-Ramp Savings:</span>
-                <span className="text-base font-bold font-mono-numbers text-emerald-600 block mt-0.5">
-                  ~${estimatedAnchorSavings}
-                </span>
-                <span className="text-slate-500 text-[10px] block mt-0.5">
-                  Netted transfers avoid international currency conversion spreads at {activeCorridor.countryB.anchorName}.
-                </span>
-              </div>
-            )}
           </div>
+        )}
+
+        {/* Cost Summary Line Items */}
+        <div className="text-xs text-slate-500 space-y-1.5 px-1 font-mono-numbers">
+          <div className="flex justify-between">
+            <span>Stellar network fee:</span>
+            <span>~0.00002 XLM</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Platform matching fee:</span>
+            <span>$0.00</span>
+          </div>
+          {transferMode === 'matched_pool' && (
+            <div className="flex justify-between text-slate-800 dark:text-slate-200 font-sans font-medium">
+              <span>Estimated anchor savings:</span>
+              <span className="font-mono-numbers">~${estimatedSavings} USDC</span>
+            </div>
+          )}
         </div>
-      </div>
+
+        {/* Form Error Banner */}
+        {formError && (
+          <div className="text-xs text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded border border-rose-200 dark:border-rose-900">
+            {formError}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <button
+          data-tour="submit-button"
+          type="submit"
+          disabled={isSubmitting || parsedAmount <= 0}
+          className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 disabled:bg-slate-200 text-white dark:text-slate-900 font-semibold text-xs rounded-md transition-colors"
+        >
+          {isSubmitting ? (
+            'Submitting on Stellar Testnet...'
+          ) : transferMode === 'direct_instant' ? (
+            `Send $${parsedAmount.toFixed(2)} USDC Instantly`
+          ) : (
+            `Place $${parsedAmount.toFixed(2)} USDC in Matching Queue`
+          )}
+        </button>
+      </form>
     </div>
   );
 };

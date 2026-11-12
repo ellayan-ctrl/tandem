@@ -19,7 +19,7 @@ export function executeTwoWayMatching(
   logs: string[];
 } {
   const now = options?.currentTimestamp || Date.now();
-  const forceSettleRemainders = options?.forceSettleRemainders ?? true;
+  const forceSettleRemainders = options?.forceSettleRemainders ?? false;
   const logs: string[] = [];
 
   logs.push(`[Engine Initialization] Evaluating corridor ${countryA} ⇄ ${countryB}`);
@@ -67,9 +67,9 @@ export function executeTwoWayMatching(
     const matchAmount = Math.min(orderA.remainingAmount, orderB.remainingAmount);
 
     if (matchAmount > 0) {
-      const txHash = `0x${Array.from({ length: 64 }, () =>
+      const txHash = Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16)
-      ).join('')}`;
+      ).join('');
 
       orderA.matchedAmount += matchAmount;
       orderA.remainingAmount = Math.max(0, orderA.remainingAmount - matchAmount);
@@ -136,25 +136,26 @@ export function executeTwoWayMatching(
     }
   }
 
-  // Handle Remainders & Expirations
+  // Handle Remainders & Expirations (either forced or because deadline reached)
   const remaindersProcessed: BatchSettlementResult['remaindersProcessed'] = [];
 
-  if (forceSettleRemainders) {
-    const remainingOrders = workingOrders.filter(
-      (o) =>
-        (o.fromCountry === countryA && o.toCountry === countryB) ||
-        (o.fromCountry === countryB && o.toCountry === countryA)
-    );
+  const remainingOrders = workingOrders.filter(
+    (o) =>
+      (o.fromCountry === countryA && o.toCountry === countryB) ||
+      (o.fromCountry === countryB && o.toCountry === countryA)
+  );
 
-    for (const order of remainingOrders) {
-      if (
-        (order.status === 'open' || order.status === 'partially_matched') &&
-        order.remainingAmount > 0
-      ) {
+  for (const order of remainingOrders) {
+    const isExpired = order.deadlineTimestamp <= now;
+    if (
+      (order.status === 'open' || order.status === 'partially_matched') &&
+      order.remainingAmount > 0 &&
+      (forceSettleRemainders || isExpired)
+    ) {
         const remainderAmount = order.remainingAmount;
-        const txHash = `0x${Array.from({ length: 64 }, () =>
+        const txHash = Array.from({ length: 64 }, () =>
           Math.floor(Math.random() * 16).toString(16)
-        ).join('')}`;
+        ).join('');
 
         if (order.remainderPolicy === 'direct_stellar_fallback') {
           // Direct Stellar USDC payment to recipient fallback
@@ -189,7 +190,6 @@ export function executeTwoWayMatching(
         order.remainingAmount = 0;
       }
     }
-  }
 
   let settlementBatch: BatchSettlementResult | null = null;
 
@@ -202,9 +202,9 @@ export function executeTwoWayMatching(
       totalVolumeNetted,
       stroopsGasCost: 1200 + matchedPairs.length * 450, // ~0.000165 XLM in stroops
       stellarLedgerSeq: 48921820 + Math.floor(Math.random() * 500),
-      txHash: `0x${Array.from({ length: 64 }, () =>
+      txHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16)
-      ).join('')}`,
+      ).join(''),
       remaindersProcessed,
     };
   }
@@ -218,6 +218,109 @@ export function executeTwoWayMatching(
   return {
     updatedOrders: workingOrders,
     settlementBatch,
+    logs,
+  };
+}
+
+/**
+ * Calculates total volume that can be immediately netted across opposing queues in all corridors.
+ */
+export function calculateTotalMatchableVolume(orders: TransferOrder[]): {
+  totalMatchable: number;
+  corridorBreakdown: Array<{
+    countryA: string;
+    countryB: string;
+    matchable: number;
+  }>;
+} {
+  const corridorsSeen = new Set<string>();
+  const breakdown: Array<{ countryA: string; countryB: string; matchable: number }> = [];
+  let totalMatchable = 0;
+
+  for (const o of orders) {
+    if (o.status !== 'open' && o.status !== 'partially_matched') continue;
+    if (o.remainingAmount <= 0) continue;
+
+    // Standardize pair key
+    const pair = [o.fromCountry, o.toCountry].sort().join('::');
+    if (corridorsSeen.has(pair)) continue;
+    corridorsSeen.add(pair);
+
+    const [cA, cB] = pair.split('::');
+
+    const volAtoB = orders
+      .filter(
+        (x) =>
+          x.fromCountry === cA &&
+          x.toCountry === cB &&
+          (x.status === 'open' || x.status === 'partially_matched') &&
+          x.remainingAmount > 0
+      )
+      .reduce((sum, x) => sum + x.remainingAmount, 0);
+
+    const volBtoA = orders
+      .filter(
+        (x) =>
+          x.fromCountry === cB &&
+          x.toCountry === cA &&
+          (x.status === 'open' || x.status === 'partially_matched') &&
+          x.remainingAmount > 0
+      )
+      .reduce((sum, x) => sum + x.remainingAmount, 0);
+
+    const matchable = Math.min(volAtoB, volBtoA);
+    if (matchable > 0) {
+      breakdown.push({ countryA: cA, countryB: cB, matchable });
+      totalMatchable += matchable;
+    }
+  }
+
+  return { totalMatchable, corridorBreakdown: breakdown };
+}
+
+/**
+ * Runs matching engine across all active corridors where opposing demand exists.
+ */
+export function runMatchingForAllCorridors(
+  orders: TransferOrder[],
+  options?: { forceSettleRemainders?: boolean; currentTimestamp?: number }
+): {
+  updatedOrders: TransferOrder[];
+  settlementBatches: BatchSettlementResult[];
+  totalVolumeNetted: number;
+  logs: string[];
+} {
+  let currentOrders = [...orders];
+  const settlementBatches: BatchSettlementResult[] = [];
+  const logs: string[] = [];
+  let totalVolumeNetted = 0;
+
+  const { corridorBreakdown } = calculateTotalMatchableVolume(currentOrders);
+
+  // If forceSettleRemainders is true or any matchable volume exists, process the corridors
+  const corridorsToProcess = corridorBreakdown.length > 0
+    ? corridorBreakdown
+    : [
+        { countryA: 'Canada', countryB: 'Kenya', matchable: 0 },
+        { countryA: 'United States', countryB: 'Nigeria', matchable: 0 },
+        { countryA: 'European Union', countryB: 'Argentina', matchable: 0 },
+        { countryA: 'United States', countryB: 'Philippines', matchable: 0 },
+      ];
+
+  for (const c of corridorsToProcess) {
+    const res = executeTwoWayMatching(currentOrders, c.countryA, c.countryB, options);
+    currentOrders = res.updatedOrders;
+    logs.push(...res.logs);
+    if (res.settlementBatch) {
+      settlementBatches.push(res.settlementBatch);
+      totalVolumeNetted += res.settlementBatch.totalVolumeNetted;
+    }
+  }
+
+  return {
+    updatedOrders: currentOrders,
+    settlementBatches,
+    totalVolumeNetted,
     logs,
   };
 }

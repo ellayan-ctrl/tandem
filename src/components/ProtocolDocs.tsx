@@ -3,17 +3,7 @@ import {
   Code,
   Copy,
   Check,
-  Cpu,
-  Layers,
-  ShieldCheck,
-  Scale,
-  Globe2,
-  Calendar,
-  Building2,
-  HelpCircle,
-  FileText,
   ChevronRight,
-  ExternalLink,
 } from 'lucide-react';
 import { SOROBAN_RUST_CONTRACT_CODE, ARCHITECTURE_COMPONENTS } from '../utils/sorobanCode';
 
@@ -31,39 +21,35 @@ export const ProtocolDocs: React.FC = () => {
   const contractMethods = [
     {
       name: 'initialize',
-      role: 'Admin Bootstrapper',
+      role: 'Admin',
       auth: 'admin.require_auth()',
-      description: 'Sets the protocol administrator and registers the canonical Stellar USDC token contract address.',
+      description: 'Sets protocol admin and canonical Stellar USDC token address.',
       signature: 'pub fn initialize(env: Env, admin: Address, usdc_token: Address) -> Result<(), EscrowError>',
       storage: 'Instance Storage: [Admin, UsdcToken, NextOrderId]',
-      events: 'None',
     },
     {
       name: 'deposit_intent',
-      role: 'P2P Sender',
+      role: 'Sender',
       auth: 'sender.require_auth()',
-      description: 'Locks USDC into contract escrow and stores transfer intent with recipient address, corridor, and matching deadline.',
+      description: 'Locks USDC in escrow and registers cross-border transfer intent with matching deadline.',
       signature: 'pub fn deposit_intent(env: Env, sender: Address, recipient: Address, from_country: Symbol, to_country: Symbol, amount: i128, deadline_ledgers: u32, policy: RemainderPolicy) -> Result<u64, EscrowError>',
       storage: 'Temporary Storage: [Order(order_id)] with extend_ttl(100, 1000)',
-      events: 'Topic: ("intent_deposited", order_id), Data: (amount, deadline)',
     },
     {
       name: 'settle_matched_pair',
-      role: 'Matching Relayer',
+      role: 'Relayer',
       auth: 'admin.require_auth()',
-      description: 'Atomic bilateral transfer delivering matched USDC directly to opposite recipients across the corridor.',
+      description: 'Executes atomic bilateral settlement delivering matched funds directly to opposite recipients.',
       signature: 'pub fn settle_matched_pair(env: Env, order_a_id: u64, order_b_id: u64, fill_amount: i128) -> Result<(), EscrowError>',
       storage: 'Updates Order(A) and Order(B) remaining_amount and status',
-      events: 'Topic: ("pair_settled", order_a_id, order_b_id), Data: fill_amount',
     },
     {
       name: 'resolve_unmatched_remainder',
       role: 'Permissionless (Post-Deadline)',
-      auth: 'No auth required after deadline ledger reached',
-      description: 'Enforces the sender preference: dispatches direct Stellar payment to recipient or refunds sender wallet.',
+      auth: 'None (after deadline_ledger reached)',
+      description: 'Executes user remainder policy: dispatches direct Stellar payment or refunds sender wallet.',
       signature: 'pub fn resolve_unmatched_remainder(env: Env, order_id: u64) -> Result<(), EscrowError>',
-      storage: 'Marks order as FallbackExecuted or Refunded, clears remaining balance',
-      events: 'Topic: ("remainder_resolved", order_id), Data: remainder_amount',
+      storage: 'Marks order as FallbackExecuted or Refunded',
     },
   ];
 
@@ -71,132 +57,73 @@ export const ProtocolDocs: React.FC = () => {
     contractMethods.find((m) => m.name === selectedMethod) || contractMethods[1];
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-xs">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2">
-          <span>Stellar Innovation Challenge</span>
-          <span>·</span>
-          <span>Documentation & Architecture</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Two-Way Street Protocol Specification
+    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+      {/* Title */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Protocol & Specifications
         </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 max-w-3xl leading-relaxed">
-          Comprehensive documentation on the bilateral USDC matching engine, Soroban smart contract invariants,
-          fiat anchor netting economics, and corridor implementation on Stellar.
+        <p className="mt-1 text-xs text-slate-500">
+          Architecture, Soroban smart contract source code, and economic analysis.
         </p>
-
-        {/* Clean Sub-navigation */}
-        <div className="flex items-center gap-2 mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
-          {[
-            { id: 'overview', label: 'Protocol Overview & Flow', icon: Layers },
-            { id: 'contract', label: 'Soroban Smart Contract (Rust)', icon: Code },
-            { id: 'economics', label: 'Netting Economics vs. Direct', icon: Scale },
-            { id: 'corridors', label: 'Corridor Analysis & Risks', icon: Globe2 },
-            { id: 'roadmap', label: '2-Week MVP & B2B Roadmap', icon: Calendar },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeSubTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as any)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      {/* Tab 1: Overview & Transaction Flow */}
+      {/* Clean Navigation Bar */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 text-xs overflow-x-auto gap-4">
+        {[
+          { id: 'overview', label: 'Overview & Flow' },
+          { id: 'contract', label: 'Soroban Contract' },
+          { id: 'economics', label: 'Netting Economics' },
+          { id: 'corridors', label: 'Corridors & Risks' },
+          { id: 'roadmap', label: 'Hackathon Roadmap' },
+        ].map((tab) => {
+          const isActive = activeSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id as any)}
+              className={`pb-2.5 font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                isActive
+                  ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white font-semibold'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Pane 1: Overview */}
       {activeSubTab === 'overview' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                How Two-Way Matching Works
-              </h2>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                Traditional cross-border remittances move money unidirectionally, requiring local payout agents and anchors to constantly repatriate cash reserves. Two-Way Street pairs opposing flows so value settles locally without physical border crossing.
+        <div className="space-y-6 text-xs leading-relaxed">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 space-y-4">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Two-Way Street Matching Mechanism
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Traditional cross-border remittances push money unidirectionally across borders, forcing destination anchors to constantly rebalance bank accounts via expensive SWIFT wires. Two-Way Street pairs opposite-direction transfers within a corridor so value is cleared domestically.
+            </p>
+
+            <div className="p-3.5 border border-slate-200 dark:border-slate-800 rounded bg-slate-50 dark:bg-slate-800/40 space-y-2">
+              <span className="font-semibold text-slate-900 dark:text-white block">
+                Canonical Scenario (Alice, Bob, Charlie)
+              </span>
+              <ul className="space-y-1 text-slate-600 dark:text-slate-400 list-disc pl-4 font-mono-numbers">
+                <li><strong>Alice</strong> (Canada → Kenya): $500 USDC (Priority 1, Fallback: Direct Stellar)</li>
+                <li><strong>Bob</strong> (Kenya → Canada): $200 USDC (Priority 2, Fallback: Refund)</li>
+                <li><strong>Charlie</strong> (Canada → Kenya): $300 USDC (Priority 3, Fallback: Refund)</li>
+              </ul>
+              <p className="text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-800 font-sans">
+                <strong>Execution:</strong> Canada → Kenya demand ($800) meets Kenya → Canada demand ($200). Alice arrived first, so Bob's $200 pairs with Alice's first $200. Bob is 100% settled. Alice is partially filled ($200/$500). When the matching window closes, Alice's remaining $300 dispatches directly to her Kenyan recipient via Stellar, while Charlie's $300 refunds to his wallet.
               </p>
             </div>
 
-            {/* The Alice, Bob, Charlie Scenario Breakdown */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200 dark:border-slate-700 space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Canonical Example Walkthrough
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <div className="flex justify-between font-bold text-slate-900 dark:text-white">
-                    <span>Alice (Canada → Kenya)</span>
-                    <span className="font-mono text-indigo-600">500 USDC</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Arrival: T0 (Priority 1)</div>
-                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                    Policy: Auto-Direct Fallback
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <div className="flex justify-between font-bold text-slate-900 dark:text-white">
-                    <span>Bob (Kenya → Canada)</span>
-                    <span className="font-mono text-indigo-600">200 USDC</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Arrival: T1 (Priority 2)</div>
-                  <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
-                    Policy: Refund to Wallet
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <div className="flex justify-between font-bold text-slate-900 dark:text-white">
-                    <span>Charlie (Canada → Kenya)</span>
-                    <span className="font-mono text-indigo-600">300 USDC</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Arrival: T2 (Priority 3)</div>
-                  <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
-                    Policy: Refund to Wallet
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 pt-2 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-indigo-600 shrink-0">1. Opposite Demand:</span>
-                  <span>Canada → Kenya demand is 800 USDC (Alice 500 + Charlie 300). Kenya → Canada demand is 200 USDC (Bob). Total matchable volume is 200 USDC.</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-indigo-600 shrink-0">2. Time Priority Matching:</span>
-                  <span>Alice arrived first. Bob's 200 USDC matches Alice's first 200 USDC. Bob is 100% filled. Alice is partially filled (200/500, leaving 300 USDC remainder). Charlie remains unmatched.</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-indigo-600 shrink-0">3. Remainder Resolution (600 USDC):</span>
-                  <span>
-                    Alice's remaining 300 USDC automatically executes a direct Stellar transfer to her Kenyan recipient (David). Charlie's 300 USDC returns safely to Charlie's wallet upon deadline expiration.
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Protocol Pillars */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {ARCHITECTURE_COMPONENTS.map((comp, idx) => (
-                <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-900 dark:text-white">{comp.title}</span>
-                    <span className="text-[10px] font-semibold text-slate-500">{comp.tag}</span>
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">{comp.description}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              {ARCHITECTURE_COMPONENTS.map((c, i) => (
+                <div key={i} className="p-3 border border-slate-200 dark:border-slate-800 rounded">
+                  <div className="font-semibold text-slate-900 dark:text-white">{c.title}</div>
+                  <p className="text-slate-500 mt-1">{c.description}</p>
                 </div>
               ))}
             </div>
@@ -204,203 +131,172 @@ export const ProtocolDocs: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 2: Soroban Smart Contract */}
+      {/* Pane 2: Soroban Smart Contract */}
       {activeSubTab === 'contract' && (
-        <div className="space-y-6 animate-fadeIn">
-          {/* Interactive ABI Inspector */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-xs">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-              Soroban Contract Endpoints & ABI
+        <div className="space-y-6 text-xs">
+          {/* Methods */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 space-y-4">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Soroban Contract Interface (ABI)
             </h2>
-            <p className="text-xs text-slate-500 mb-4">
-              Contract deployed on Stellar Testnet: <code className="font-mono text-indigo-600">CC7X...2WAY</code>
-            </p>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-4 space-y-1">
                 {contractMethods.map((m) => (
                   <button
                     key={m.name}
                     onClick={() => setSelectedMethod(m.name)}
-                    className={`w-full text-left p-3 rounded-lg border text-xs font-mono transition-all ${
+                    className={`w-full text-left p-2 rounded text-xs font-mono transition-colors ${
                       selectedMethod === m.name
-                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-950 dark:text-indigo-200 font-bold ring-1 ring-indigo-600'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <div className="flex justify-between">
-                      <span>{m.name}()</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-sans mt-0.5">{m.role}</div>
+                    {m.name}()
                   </button>
                 ))}
               </div>
 
-              <div className="lg:col-span-8 bg-slate-50 dark:bg-slate-900/60 p-5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{currentMethod.name}()</span>
-                  <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded">
-                    {currentMethod.role}
-                  </span>
+              <div className="md:col-span-8 p-3.5 border border-slate-200 dark:border-slate-800 rounded bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                <div className="flex justify-between items-baseline font-mono text-slate-900 dark:text-white font-semibold">
+                  <span>{currentMethod.name}()</span>
+                  <span className="text-[11px] font-sans text-slate-500">{currentMethod.role}</span>
                 </div>
-                <p className="text-slate-600 dark:text-slate-300">{currentMethod.description}</p>
-                <div>
-                  <span className="text-[11px] font-semibold text-slate-400 block mb-1">Signature:</span>
-                  <pre className="p-3 bg-slate-900 text-indigo-300 rounded-lg font-mono text-[11px] overflow-x-auto">
-                    {currentMethod.signature}
-                  </pre>
-                </div>
-                <div className="grid grid-cols-2 gap-3 pt-1 text-[11px]">
-                  <div className="p-2.5 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                    <span className="font-semibold text-slate-400 block mb-0.5">Authorization:</span>
-                    <span className="font-mono text-indigo-600 dark:text-indigo-400">{currentMethod.auth}</span>
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                    <span className="font-semibold text-slate-400 block mb-0.5">Storage Footprint:</span>
-                    <span className="text-slate-600 dark:text-slate-300">{currentMethod.storage}</span>
-                  </div>
+                <p className="text-slate-600 dark:text-slate-400">{currentMethod.description}</p>
+                <pre className="p-2.5 bg-slate-900 text-slate-200 rounded font-mono text-[11px] overflow-x-auto">
+                  {currentMethod.signature}
+                </pre>
+                <div className="text-[11px] text-slate-500 font-mono">
+                  Storage: {currentMethod.storage}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Rust Code Box */}
-          <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-slate-200">
-                contracts/two_way_escrow/src/lib.rs (Soroban Rust)
-              </span>
+          <div className="border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-950 overflow-hidden text-xs">
+            <div className="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center text-slate-300 font-mono">
+              <span>contracts/two_way_escrow/src/lib.rs</span>
               <button
                 onClick={handleCopyCode}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                className="px-2.5 py-1 text-xs rounded border border-slate-700 hover:bg-slate-800 text-slate-200"
               >
-                {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                {copiedCode ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <div className="p-4 overflow-x-auto max-h-[500px] text-xs font-mono text-slate-300 leading-relaxed">
-              <pre>{SOROBAN_RUST_CONTRACT_CODE}</pre>
-            </div>
+            <pre className="p-4 text-slate-300 font-mono overflow-x-auto max-h-[450px] leading-relaxed">
+              {SOROBAN_RUST_CONTRACT_CODE}
+            </pre>
           </div>
         </div>
       )}
 
-      {/* Tab 3: Netting Economics vs. Direct Stellar */}
+      {/* Pane 3: Economics */}
       {activeSubTab === 'economics' && (
-        <div className="space-y-6 animate-fadeIn text-xs leading-relaxed">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-5">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Rigorous Evaluation: Netting vs. Direct Stellar Transfers
-            </h2>
+        <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 text-xs leading-relaxed space-y-4">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Matching vs. Direct Stellar Transfers
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400">
+            A native Stellar USDC transfer costs $0.00001 and completes in 3-5 seconds. Why match transfers?
+          </p>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-              <span className="font-bold text-slate-900 dark:text-white block">
-                The Hard Truth: Stellar L1 is already fast and cheap
-              </span>
-              <p className="text-slate-600 dark:text-slate-300">
-                A native Stellar payment of USDC costs ~0.00001 XLM and settles in 3-5 seconds. Escrowing USDC into a smart contract and waiting for an opposing match actually costs slightly more network gas and introduces waiting latency.
+          <div className="space-y-3 pt-2">
+            <div>
+              <strong className="text-slate-900 dark:text-white block">1. The Fiat Anchor Problem (SEP-24/31)</strong>
+              <p className="text-slate-500 mt-0.5">
+                The bottleneck in remittance is not the blockchain—it is the local cash-out anchor in Kenya or Canada. If flows are strictly one-way, anchors run out of local currency reserves and must execute international bank wires to rebalance, charging users 2% to 4% in FX spreads.
               </p>
             </div>
 
-            <div className="space-y-3 pt-1">
-              <span className="font-bold text-slate-900 dark:text-white block">
-                Where the Real Value Lies: Local Anchor Netting (SEP-24 / SEP-31)
-              </span>
-              <p className="text-slate-600 dark:text-slate-300">
-                The real expense in cross-border remittances is <strong>not blockchain gas</strong>—it is <strong>local fiat off-ramp fees (1.5% to 4%)</strong> and the cost anchors incur rebalancing cash reserves internationally via correspondent banks (SWIFT).
+            <div>
+              <strong className="text-slate-900 dark:text-white block">2. Domestic Netting</strong>
+              <p className="text-slate-500 mt-0.5">
+                When two opposing $200 transfers cancel out, Canadian dollars stay in Canada and Kenyan shillings stay in Kenya. Anchors clear balances domestically without SWIFT wires, passing on lower spreads.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <span className="font-semibold text-slate-900 dark:text-white block mb-1">Unidirectional Flow (Legacy / Direct)</span>
-                  <p className="text-slate-500">
-                    Canadian anchor builds up excess CAD while Kenyan anchor depletes KES reserves. The Kenyan anchor must buy foreign currency and wire funds internationally to rebalance, charging users high cash-out spreads.
-                  </p>
-                </div>
-                <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                  <span className="font-semibold text-emerald-900 dark:text-emerald-200 block mb-1">Two-Way Matching Flow</span>
-                  <p className="text-emerald-800 dark:text-emerald-300/90">
-                    Opposing flows cancel out. Both anchors maintain balanced domestic liquidity and avoid international bank wires, allowing them to pass on fee discounts to users.
-                  </p>
-                </div>
-              </div>
+            </div>
+
+            <div>
+              <strong className="text-slate-900 dark:text-white block">3. Guaranteed Fallback</strong>
+              <p className="text-slate-500 mt-0.5">
+                To eliminate counterparty delay, if an opposing peer does not match before the deadline, our contract executes an immediate direct Stellar payment. Users get netting savings if matched, and zero delays if unmatched.
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 4: Corridor Viability & Risks */}
+      {/* Pane 4: Corridors & Risks */}
       {activeSubTab === 'corridors' && (
-        <div className="space-y-6 animate-fadeIn text-xs">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-4">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              High-Viability Corridors & Risk Analysis
-            </h2>
+        <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 text-xs leading-relaxed space-y-4">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Corridors & Operational Risks
+          </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
-                <span className="font-bold text-slate-900 dark:text-white">🇨🇦 Canada ⇄ 🇰🇪 Kenya</span>
-                <p className="text-slate-500">
-                  High diaspora remittance from Canada matched against Kenyan remote software contractors, university fees, and coffee trade exporters paying Canadian vendors. Anchors: PayTrie / Kotani Pay.
-                </p>
-              </div>
-
-              <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
-                <span className="font-bold text-slate-900 dark:text-white">🇺🇸 United States ⇄ 🇳🇬 Nigeria</span>
-                <p className="text-slate-500">
-                  Massive USD/NGN remittance corridor paired with Nigerian tech freelancers and international tuition. Anchors: Yellow Card, Chipper Cash, MoneyGram Access.
-                </p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="p-3 border border-slate-200 dark:border-slate-800 rounded">
+              <span className="font-semibold text-slate-900 dark:text-white block">Canada ⇄ Kenya</span>
+              <p className="text-slate-500 mt-0.5">
+                Diaspora remittances from Canada paired against Nairobi tech contractors and coffee/tea exporters paying Canadian vendors. Anchors: PayTrie / Kotani Pay.
+              </p>
             </div>
 
-            <div className="pt-2">
-              <span className="font-bold text-slate-900 dark:text-white block mb-2">Key Operational Risks & Mitigations</span>
-              <div className="space-y-2 text-slate-600 dark:text-slate-300">
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <strong className="text-slate-900 dark:text-white">1. Asymmetric Liquidity:</strong> When one direction has 5x more volume, unmatched orders could wait. <em>Mitigation:</em> Pre-configured direct Stellar transfer fallback ensures guaranteed delivery.
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <strong className="text-slate-900 dark:text-white">2. Travel Rule Compliance:</strong> Matching parties must retain sender records. <em>Mitigation:</em> Senders undergo KYC through participating SEP-31 anchors before escrow authorization.
-                </div>
-              </div>
+            <div className="p-3 border border-slate-200 dark:border-slate-800 rounded">
+              <span className="font-semibold text-slate-900 dark:text-white block">United States ⇄ Nigeria</span>
+              <p className="text-slate-500 mt-0.5">
+                Remittances paired with Nigerian remote engineers and university tuition. Anchors: Yellow Card, Chipper Cash.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2 space-y-2">
+            <span className="font-semibold text-slate-900 dark:text-white block">Risk Mitigations</span>
+            <div className="text-slate-600 dark:text-slate-400">
+              <strong>Asymmetry:</strong> Automated direct Stellar fallback ensures users are never stranded.
+            </div>
+            <div className="text-slate-600 dark:text-slate-400">
+              <strong>Compliance:</strong> Local anchors execute KYC under SEP-31 before authorizing escrow deposits.
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 5: Roadmap */}
+      {/* Pane 5: Roadmap */}
       {activeSubTab === 'roadmap' && (
-        <div className="space-y-6 animate-fadeIn text-xs">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-5">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              2-Week Student MVP & Enterprise Expansion
-            </h2>
+        <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-5 bg-white dark:bg-slate-900 text-xs leading-relaxed space-y-4">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            2-Week Hackathon Blueprint & B2B Vision
+          </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="font-bold text-indigo-600 block mb-1">Days 1–3</span>
-                <p className="text-slate-500">Soroban contract in Rust. Test deposits, bilateral settlement, and refund triggers via cargo test.</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="font-bold text-indigo-600 block mb-1">Days 4–7</span>
-                <p className="text-slate-500">Deterministic TypeScript relayer engine for queue sorting and batch settlement submission.</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="font-bold text-indigo-600 block mb-1">Days 8–11</span>
-                <p className="text-slate-500">React + Vite frontend with wallet connect, expiry countdowns, and the Alice-Bob-Charlie scenario runner.</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="font-bold text-indigo-600 block mb-1">Days 12–14</span>
-                <p className="text-slate-500">Testnet deployment, edge-case testing, and 3-minute pitch video on anchor netting economics.</p>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="p-2.5 border border-slate-200 dark:border-slate-800 rounded">
+              <span className="font-mono text-slate-400 block mb-0.5">Days 1–3</span>
+              <span className="font-semibold text-slate-900 dark:text-white">Soroban Contract</span>
+              <p className="text-slate-500 mt-1">Escrow and settlement logic tested via cargo test.</p>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-              <span className="font-bold text-slate-900 dark:text-white block mb-1.5">Future B2B Institutional Expansion</span>
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                The architecture easily expands to multinational corporate treasury netting: multilateral invoice rings (e.g. Canada pays Kenya, Kenya pays UAE, UAE pays Canada) and automated daily 4:00 PM clearing runs integrated with ERP systems.
-              </p>
+            <div className="p-2.5 border border-slate-200 dark:border-slate-800 rounded">
+              <span className="font-mono text-slate-400 block mb-0.5">Days 4–7</span>
+              <span className="font-semibold text-slate-900 dark:text-white">Relayer Engine</span>
+              <p className="text-slate-500 mt-1">Deterministic matching service polling contract events.</p>
             </div>
+
+            <div className="p-2.5 border border-slate-200 dark:border-slate-800 rounded">
+              <span className="font-mono text-slate-400 block mb-0.5">Days 8–11</span>
+              <span className="font-semibold text-slate-900 dark:text-white">Web Portal</span>
+              <p className="text-slate-500 mt-1">Transfer flow, order book, and Stellar testnet wallet.</p>
+            </div>
+
+            <div className="p-2.5 border border-slate-200 dark:border-slate-800 rounded">
+              <span className="font-mono text-slate-400 block mb-0.5">Days 12–14</span>
+              <span className="font-semibold text-slate-900 dark:text-white">Submission</span>
+              <p className="text-slate-500 mt-1">Testnet deployment and video presentation.</p>
+            </div>
+          </div>
+
+          <div className="pt-2 text-slate-600 dark:text-slate-400">
+            <strong className="text-slate-900 dark:text-white block mb-0.5">B2B Expansion:</strong>
+            The same architecture extends to multilateral clearing rings (e.g. Canada pays Kenya, Kenya pays UAE, UAE pays Canada) and automated daily 4:00 PM clearing runs integrated with enterprise ERPs.
           </div>
         </div>
       )}

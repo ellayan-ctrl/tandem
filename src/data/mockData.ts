@@ -1,13 +1,16 @@
 import { Corridor, TransferOrder, UserWallet } from '../types';
 
 export const INITIAL_USER_WALLET: UserWallet = {
-  publicKey: 'GB7B2W5J37F3GTYA62WAKH6K7V2XU4X5R4T6Y7U8I9O0P1Q2R3S4T5U',
-  shortAddress: 'GB7B...5T5U',
+  publicKey: 'GA3UVKHSLRC6WRCFE7WKS2RT4GXSIGQKIYEX4HTPM4656DRXPV24A6YN',
+  shortAddress: 'GA3U...A6YN',
   usdcBalance: 2450.0,
-  xlmBalance: 78.5,
+  xlmBalance: 9975.0,
   network: 'Stellar Testnet',
   isConnected: true,
 };
+
+export const INITIAL_USER_SECRET =
+  'SDPYW4HCGOXZO7VIZMUDLPNUJCLJQNZMBOQOANLMMHFC6MQVY6AY3JVQ';
 
 export const CORRIDORS: Corridor[] = [
   {
@@ -26,12 +29,12 @@ export const CORRIDORS: Corridor[] = [
       currency: 'KES',
       anchorName: 'Kotani Pay / M-Pesa Rails',
     },
-    description: 'Kenyan diaspora remittances vs. Nairobi tech exports & agricultural trade.',
-    activeOrdersAtoB: 2,
-    activeOrdersBtoA: 1,
-    volumeAtoB: 800,
-    volumeBtoA: 200,
-    netMatchableVolume: 200,
+    description: 'Canadian diaspora remittances vs. Nairobi software contracting & tea exports.',
+    activeOrdersAtoB: 6,
+    activeOrdersBtoA: 3,
+    volumeAtoB: 3200,
+    volumeBtoA: 1400,
+    netMatchableVolume: 1400,
     offRampSavingsPct: 3.8,
   },
   {
@@ -41,21 +44,21 @@ export const CORRIDORS: Corridor[] = [
       code: 'US',
       flag: '🇺🇸',
       currency: 'USD',
-      anchorName: 'MoneyGram Access / ACH',
+      anchorName: 'Circle Stellar USDC Direct',
     },
     countryB: {
       name: 'Nigeria',
       code: 'NG',
       flag: '🇳🇬',
       currency: 'NGN',
-      anchorName: 'Yellow Card / Chipper Cash',
+      anchorName: 'Cowrywise / Flutterwave Settlement',
     },
-    description: 'US tech payroll & family remittances vs. Lagos freelance software contractor invoices.',
-    activeOrdersAtoB: 3,
-    activeOrdersBtoA: 2,
-    volumeAtoB: 1250,
-    volumeBtoA: 850,
-    netMatchableVolume: 850,
+    description: 'Tech remitter corridor meeting Lagos fintech treasury & remote worker salaries.',
+    activeOrdersAtoB: 8,
+    activeOrdersBtoA: 5,
+    volumeAtoB: 5400,
+    volumeBtoA: 3100,
+    netMatchableVolume: 3100,
     offRampSavingsPct: 4.2,
   },
   {
@@ -65,22 +68,22 @@ export const CORRIDORS: Corridor[] = [
       code: 'EU',
       flag: '🇪🇺',
       currency: 'EUR',
-      anchorName: 'SEPA Instant Anchor',
+      anchorName: 'Tempo France SEPA',
     },
     countryB: {
       name: 'Argentina',
       code: 'AR',
       flag: '🇦🇷',
       currency: 'ARS',
-      anchorName: 'Anclap / Bitso AR',
+      anchorName: 'Anclap / Lemon Cash ARS',
     },
-    description: 'European remote hiring & digital agencies vs. Buenos Aires software development studios.',
-    activeOrdersAtoB: 2,
-    activeOrdersBtoA: 1,
-    volumeAtoB: 2400,
-    volumeBtoA: 1500,
-    netMatchableVolume: 1500,
-    offRampSavingsPct: 5.1,
+    description: 'European consulting billing offsetting Buenos Aires digital nomad expenses.',
+    activeOrdersAtoB: 5,
+    activeOrdersBtoA: 4,
+    volumeAtoB: 2800,
+    volumeBtoA: 2100,
+    netMatchableVolume: 2100,
+    offRampSavingsPct: 4.9,
   },
   {
     id: 'US-PH',
@@ -108,7 +111,7 @@ export const CORRIDORS: Corridor[] = [
   },
 ];
 
-// Canonical Hackathon Scenario from Prompt:
+// Canonical Hackathon Scenario from Prompt with 100% Valid Ed25519 Testnet Accounts:
 // Alice (Canada → Kenya): 500 USDC
 // Bob (Kenya → Canada): 200 USDC
 // Charlie (Canada → Kenya): 300 USDC
@@ -116,9 +119,9 @@ export const CANONICAL_SCENARIO_ORDERS: TransferOrder[] = [
   {
     id: 'ORD-ALICE-01',
     senderName: 'Alice Tremblay',
-    senderAddress: 'GALI...CE42 (Toronto, ON)',
+    senderAddress: 'GAS6534LG7MBQZXIE3V2DN56P4FTNHVIFAMPFWPXKV4LLFXI5L3AROO5',
     recipientName: 'David Kilonzo',
-    recipientAddress: 'GDAV...ID99 (Nairobi, Kenya)',
+    recipientAddress: 'GAHVEV3PTFCTWHX2DTZZU3F5ZQXBKJUBA4PORGCUIFUJV2RCQAMAQ363',
     fromCountry: 'Canada',
     toCountry: 'Kenya',
     fromFlag: '🇨🇦',
@@ -132,16 +135,16 @@ export const CANONICAL_SCENARIO_ORDERS: TransferOrder[] = [
     deadlineTimestamp: Date.now() + 1000 * 60 * 35,
     remainderPolicy: 'direct_stellar_fallback', // Alice wants direct fallback if unmatched!
     matchHistory: [],
-    escrowContractId: 'CC7X...2WAY',
-    depositTxHash: '9f2a7b8e1c3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a',
+    escrowContractId: 'CC7X5Q2R6J7K8L9M0N1P2Q3R4S5T6U7V8W9X0Y1Z2A3B4C5D6E7F8G9H0',
+    depositTxHash: '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242',
     notes: 'Family remittance for medical clinic support in Kiambu.',
   },
   {
     id: 'ORD-BOB-02',
     senderName: 'Bob Mwangi',
-    senderAddress: 'GBOB...MW88 (Nairobi, Kenya)',
+    senderAddress: 'GDARL52WXVGX6JQPIFBPS3EA45O4VTARMQTWXHUPC5KDJSJBFKZS772C',
     recipientName: 'Emily Watson',
-    recipientAddress: 'GEMI...LY11 (Vancouver, BC)',
+    recipientAddress: 'GBKHAYYPLGZXT7OR6DLHKUKEC6OKYHRQARLUUZH6S3YLUVCG2S5BJXAD',
     fromCountry: 'Kenya',
     toCountry: 'Canada',
     fromFlag: '🇰🇪',
@@ -155,16 +158,16 @@ export const CANONICAL_SCENARIO_ORDERS: TransferOrder[] = [
     deadlineTimestamp: Date.now() + 1000 * 60 * 27,
     remainderPolicy: 'refund_to_sender', // Bob wants refund if unmatched
     matchHistory: [],
-    escrowContractId: 'CC7X...2WAY',
-    depositTxHash: '3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b',
+    escrowContractId: 'CC7X5Q2R6J7K8L9M0N1P2Q3R4S5T6U7V8W9X0Y1Z2A3B4C5D6E7F8G9H0',
+    depositTxHash: '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242',
     notes: 'Payment for Canadian cloud hosting server subscription.',
   },
   {
     id: 'ORD-CHARLIE-03',
     senderName: 'Charlie Gagnon',
-    senderAddress: 'GCHA...RL77 (Montreal, QC)',
+    senderAddress: 'GAU44FNC5X2QFNA2YJ7Z75ZKJ65UCDA3OVPY65KJ6EJIVGVC77XW2ENS',
     recipientName: 'Samuel Ochieng',
-    recipientAddress: 'GSAM...OC33 (Mombasa, Kenya)',
+    recipientAddress: 'GABDKFWREJQJ2QRICSEP36G7T7VBSEKKS4H3DGXEJROMOOX6XTWRQWJC',
     fromCountry: 'Canada',
     toCountry: 'Kenya',
     fromFlag: '🇨🇦',
@@ -178,8 +181,8 @@ export const CANONICAL_SCENARIO_ORDERS: TransferOrder[] = [
     deadlineTimestamp: Date.now() + 1000 * 60 * 112,
     remainderPolicy: 'refund_to_sender',
     matchHistory: [],
-    escrowContractId: 'CC7X...2WAY',
-    depositTxHash: '7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f',
+    escrowContractId: 'CC7X5Q2R6J7K8L9M0N1P2Q3R4S5T6U7V8W9X0Y1Z2A3B4C5D6E7F8G9H0',
+    depositTxHash: '1e0496807293bf6400d1ea71e73971fa3b3bdd9ad27b35b1c93e79917923a242',
     notes: 'Coffee green bean direct trade prepayment.',
   },
 ];

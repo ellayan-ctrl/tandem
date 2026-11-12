@@ -1,4 +1,7 @@
-export type RemainderPolicy = 'direct_stellar_fallback' | 'refund_to_sender';
+export type RemainderPolicy =
+  | 'direct_stellar_fallback'
+  | 'refund_to_sender'
+  | 'convert_to_fiat_bank';
 
 export type OrderStatus =
   | 'open'
@@ -7,6 +10,7 @@ export type OrderStatus =
   | 'settled'
   | 'refunded'
   | 'fallback_executed'
+  | 'remainder_converted'
   | 'cancelled';
 
 export interface MatchFillRecord {
@@ -16,6 +20,38 @@ export interface MatchFillRecord {
   timestamp: number;
   recipientSettled: string;
   txHash: string;
+}
+
+export interface BankAccount {
+  id: string;
+  institutionName: string;
+  accountType: 'checking' | 'savings' | 'mobile_money';
+  accountNumberMasked: string;
+  routingOrSortCode: string;
+  currency: string;
+  fiatBalance: number;
+  country: string;
+  holderName: string;
+  isConnected: boolean;
+  isPrimary?: boolean;
+}
+
+export interface BankingTransaction {
+  id: string;
+  type: 'deposit_onramp' | 'withdraw_offramp' | 'remainder_conversion';
+  bankAccountId: string;
+  bankName: string;
+  fiatCurrency: string;
+  fiatAmount: number;
+  usdcAmount: number;
+  exchangeRate: number;
+  fee: number;
+  status: 'completed' | 'processing';
+  clearingRef: string;
+  stellarTxHash: string;
+  timestamp: number;
+  orderId?: string;
+  recipientName?: string;
 }
 
 export interface TransferOrder {
@@ -43,6 +79,19 @@ export interface TransferOrder {
   fallbackTxHash?: string;
   transferType?: 'matched_pool' | 'direct_instant';
   notes?: string;
+  recipientBankDetails?: {
+    bankName: string;
+    accountNumberMasked: string;
+    currency: string;
+  };
+  convertedRemainderFiat?: {
+    fiatAmount: number;
+    currency: string;
+    exchangeRate: number;
+    bankClearingRef: string;
+    conversionTxHash: string;
+    timestamp: number;
+  };
 }
 
 export interface Corridor {
