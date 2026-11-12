@@ -150,31 +150,6 @@ export async function loadLiveAccountDetails(publicKey, secretKey) {
 }
 
 /**
- * Pre-funded and verified Stellar Testnet Institution accounts with Circle USDC trustlines
- */
-export const INSTITUTION_A = {
-  id: 'INST-CANADA-01',
-  name: 'PayTrie Settlement Anchor (Canada)',
-  shortName: 'Institution A (Canada)',
-  country: 'Canada',
-  currency: 'CAD',
-  flag: '🇨🇦',
-  publicKey: 'GANIMAPEKBIP3YXIY7SZIRQ7XARNHDGTPCN5UTIBTXX64LCSFQ6DA4JO',
-  secretKey: 'SBJJG3ZECTJEQV3W7EW4QWNE35ZGTYXX5Q7U74Q2OIASMPF3YV3L47JH',
-};
-
-export const INSTITUTION_B = {
-  id: 'INST-KENYA-02',
-  name: 'Kotani Pay Settlement Anchor (Kenya)',
-  shortName: 'Institution B (Kenya)',
-  country: 'Kenya',
-  currency: 'KES',
-  flag: '🇰🇪',
-  publicKey: 'GC7MO3K6MUMXK3W3XWAN2XJYWO5RNPSTJXNTV5SZQAUENT7GWIFBZEUI',
-  secretKey: 'SAUTNDQMRFT6GYBHGYZ3DDMRLPHJEHUIDJ7YDRGWMPNBY6NKHZLV2Q7Y',
-};
-
-/**
  * Creates a trustline for official Circle Testnet USDC on a given Stellar keypair
  */
 export async function createUsdcTrustline(secretKey) {
