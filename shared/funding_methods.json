@@ -1,0 +1,1263 @@
+{
+  "$comment": "How a sender can pay in the MATCHED amount, by sender country. Read by the Python server (validation, masking, funding records) and the JS front end (forms). Simulated rails in this testnet demo.",
+  "linkedBankId": "linked-bank",
+  "currencyByCountry": {
+    "Canada": "CAD",
+    "Kenya": "KES",
+    "Nigeria": "NGN",
+    "Philippines": "PHP",
+    "United States": "USD",
+    "European Union": "EUR",
+    "Argentina": "ARS"
+  },
+  "kinds": {
+    "debit_card": {
+      "label": "Debit card",
+      "blurb": "Pay with your debit card. Card details are collected by the card processor at checkout."
+    },
+    "bank_account": {
+      "label": "Bank account",
+      "blurb": "Pull the money directly from your own bank account."
+    },
+    "instant_transfer": {
+      "label": "Instant transfer",
+      "blurb": "Send it from your banking app; it arrives in seconds."
+    },
+    "cash_deposit": {
+      "label": "Cash at an agent",
+      "blurb": "Hand cash to an agent with your reference number and photo ID."
+    },
+    "mobile_money": {
+      "label": "Mobile money",
+      "blurb": "Pay from your mobile wallet; you approve a prompt on your phone."
+    }
+  },
+  "providers": {
+    "Canada": [
+      {
+        "id": "ca-debit",
+        "name": "Debit card (Interac Debit / Visa Debit)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "ca-rbc",
+        "name": "RBC Royal Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "transit",
+            "label": "Transit number",
+            "placeholder": "5 digits",
+            "pattern": "[0-9]{5}"
+          },
+          {
+            "key": "institution",
+            "label": "Institution number",
+            "placeholder": "3 digits",
+            "pattern": "[0-9]{3}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "7–12 digits",
+            "pattern": "[0-9]{7,12}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-td",
+        "name": "TD Canada Trust",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "transit",
+            "label": "Transit number",
+            "placeholder": "5 digits",
+            "pattern": "[0-9]{5}"
+          },
+          {
+            "key": "institution",
+            "label": "Institution number",
+            "placeholder": "3 digits",
+            "pattern": "[0-9]{3}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "7–12 digits",
+            "pattern": "[0-9]{7,12}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-scotiabank",
+        "name": "Scotiabank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "transit",
+            "label": "Transit number",
+            "placeholder": "5 digits",
+            "pattern": "[0-9]{5}"
+          },
+          {
+            "key": "institution",
+            "label": "Institution number",
+            "placeholder": "3 digits",
+            "pattern": "[0-9]{3}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "7–12 digits",
+            "pattern": "[0-9]{7,12}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-bmo",
+        "name": "BMO Bank of Montreal",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "transit",
+            "label": "Transit number",
+            "placeholder": "5 digits",
+            "pattern": "[0-9]{5}"
+          },
+          {
+            "key": "institution",
+            "label": "Institution number",
+            "placeholder": "3 digits",
+            "pattern": "[0-9]{3}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "7–12 digits",
+            "pattern": "[0-9]{7,12}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-cibc",
+        "name": "CIBC",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "transit",
+            "label": "Transit number",
+            "placeholder": "5 digits",
+            "pattern": "[0-9]{5}"
+          },
+          {
+            "key": "institution",
+            "label": "Institution number",
+            "placeholder": "3 digits",
+            "pattern": "[0-9]{3}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "7–12 digits",
+            "pattern": "[0-9]{7,12}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-other-bank",
+        "name": "My bank (other)",
+        "kind": "bank_account",
+        "eta": "1–2 business days",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "transit",
+            "label": "Transit number",
+            "placeholder": "5 digits",
+            "pattern": "[0-9]{5}"
+          },
+          {
+            "key": "institution",
+            "label": "Institution number",
+            "placeholder": "3 digits",
+            "pattern": "[0-9]{3}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "7–12 digits",
+            "pattern": "[0-9]{7,12}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-interac",
+        "name": "Interac e-Transfer",
+        "kind": "instant_transfer",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "contact",
+            "label": "Your Interac email or mobile",
+            "placeholder": "you@example.com",
+            "pattern": "([^@\\s]+@[^@\\s]+\\.[^@\\s]+|\\+?[0-9 ]{10,15})",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ca-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      },
+      {
+        "id": "ca-westernunion",
+        "name": "Western Union agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
+    "Kenya": [
+      {
+        "id": "ke-mpesa",
+        "name": "M-Pesa (Safaricom)",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "phone",
+            "label": "Your mobile number",
+            "placeholder": "+254 712 345 678",
+            "pattern": "\\+?[0-9 ]{8,16}",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ke-airtel",
+        "name": "Airtel Money",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "phone",
+            "label": "Your mobile number",
+            "placeholder": "+254 733 123 456",
+            "pattern": "\\+?[0-9 ]{8,16}",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ke-debit",
+        "name": "Debit card (Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "ke-equity",
+        "name": "Equity Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "8–16 digits",
+            "pattern": "[0-9]{8,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ke-kcb",
+        "name": "KCB Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "8–16 digits",
+            "pattern": "[0-9]{8,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ke-coop",
+        "name": "Co-operative Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "8–16 digits",
+            "pattern": "[0-9]{8,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ke-other-bank",
+        "name": "My bank (other)",
+        "kind": "bank_account",
+        "eta": "1–2 business days",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "8–16 digits",
+            "pattern": "[0-9]{8,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ke-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      },
+      {
+        "id": "ke-westernunion",
+        "name": "Western Union agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
+    "Nigeria": [
+      {
+        "id": "ng-opay",
+        "name": "OPay",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "phone",
+            "label": "Your mobile number",
+            "placeholder": "+234 803 123 4567",
+            "pattern": "\\+?[0-9 ]{8,16}",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ng-palmpay",
+        "name": "PalmPay",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "phone",
+            "label": "Your mobile number",
+            "placeholder": "+234 806 123 4567",
+            "pattern": "\\+?[0-9 ]{8,16}",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ng-debit",
+        "name": "Debit card (Verve / Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "ng-gtbank",
+        "name": "GTBank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "NUBAN account number",
+            "placeholder": "10 digits",
+            "pattern": "[0-9]{10}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ng-access",
+        "name": "Access Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "NUBAN account number",
+            "placeholder": "10 digits",
+            "pattern": "[0-9]{10}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ng-zenith",
+        "name": "Zenith Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "NUBAN account number",
+            "placeholder": "10 digits",
+            "pattern": "[0-9]{10}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ng-firstbank",
+        "name": "First Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "NUBAN account number",
+            "placeholder": "10 digits",
+            "pattern": "[0-9]{10}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ng-other-bank",
+        "name": "My bank (other)",
+        "kind": "bank_account",
+        "eta": "1–2 business days",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "NUBAN account number",
+            "placeholder": "10 digits",
+            "pattern": "[0-9]{10}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ng-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
+    "Philippines": [
+      {
+        "id": "ph-gcash",
+        "name": "GCash",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "phone",
+            "label": "Your mobile number",
+            "placeholder": "+63 917 123 4567",
+            "pattern": "\\+?[0-9 ]{8,16}",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ph-maya",
+        "name": "Maya",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "phone",
+            "label": "Your mobile number",
+            "placeholder": "+63 918 123 4567",
+            "pattern": "\\+?[0-9 ]{8,16}",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ph-debit",
+        "name": "Debit card (Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "ph-bdo",
+        "name": "BDO Unibank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "10–16 digits",
+            "pattern": "[0-9]{10,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ph-bpi",
+        "name": "BPI",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "10–16 digits",
+            "pattern": "[0-9]{10,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ph-other-bank",
+        "name": "My bank (other)",
+        "kind": "bank_account",
+        "eta": "1–2 business days",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "10–16 digits",
+            "pattern": "[0-9]{10,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ph-cebuana",
+        "name": "Cebuana Lhuillier",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      },
+      {
+        "id": "ph-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
+    "United States": [
+      {
+        "id": "us-debit",
+        "name": "Debit card (Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "us-chase",
+        "name": "Chase",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "routing",
+            "label": "ABA routing number",
+            "placeholder": "9 digits",
+            "pattern": "[0-9]{9}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "4–17 digits",
+            "pattern": "[0-9]{4,17}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "us-bofa",
+        "name": "Bank of America",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "routing",
+            "label": "ABA routing number",
+            "placeholder": "9 digits",
+            "pattern": "[0-9]{9}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "4–17 digits",
+            "pattern": "[0-9]{4,17}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "us-wellsfargo",
+        "name": "Wells Fargo",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "routing",
+            "label": "ABA routing number",
+            "placeholder": "9 digits",
+            "pattern": "[0-9]{9}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "4–17 digits",
+            "pattern": "[0-9]{4,17}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "us-other-bank",
+        "name": "My bank (other)",
+        "kind": "bank_account",
+        "eta": "1–2 business days",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "routing",
+            "label": "ABA routing number",
+            "placeholder": "9 digits",
+            "pattern": "[0-9]{9}"
+          },
+          {
+            "key": "accountNumber",
+            "label": "Account number",
+            "placeholder": "4–17 digits",
+            "pattern": "[0-9]{4,17}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "us-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      },
+      {
+        "id": "us-westernunion",
+        "name": "Western Union agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
+    "European Union": [
+      {
+        "id": "eu-debit",
+        "name": "Debit card (Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "eu-sepa",
+        "name": "SEPA bank transfer (any EU bank)",
+        "kind": "bank_account",
+        "eta": "Same day (SEPA Instant where supported)",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "iban",
+            "label": "IBAN",
+            "placeholder": "e.g. DE89 3704 0044 0532 0130 00",
+            "pattern": "[A-Z]{2}[0-9]{2}[A-Z0-9 ]{11,32}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "eu-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
+    "Argentina": [
+      {
+        "id": "ar-mercadopago",
+        "name": "Mercado Pago",
+        "kind": "mobile_money",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "cvu",
+            "label": "Your CVU or alias",
+            "placeholder": "22-digit CVU or alias",
+            "pattern": "([0-9]{22}|[A-Za-z0-9.-]{6,20})",
+            "sensitive": true
+          },
+          {
+            "key": "payerName",
+            "label": "Registered wallet name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          }
+        ]
+      },
+      {
+        "id": "ar-debit",
+        "name": "Debit card (Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "ar-nacion",
+        "name": "Banco Nación",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cbu",
+            "label": "CBU / CVU",
+            "placeholder": "22 digits",
+            "pattern": "[0-9]{22}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ar-galicia",
+        "name": "Banco Galicia",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cbu",
+            "label": "CBU / CVU",
+            "placeholder": "22 digits",
+            "pattern": "[0-9]{22}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ar-other-bank",
+        "name": "My bank (other)",
+        "kind": "bank_account",
+        "eta": "1–2 business days",
+        "fields": [
+          {
+            "key": "bankName",
+            "label": "Bank name",
+            "placeholder": "Your bank",
+            "pattern": ".{2,60}"
+          },
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cbu",
+            "label": "CBU / CVU",
+            "placeholder": "22 digits",
+            "pattern": "[0-9]{22}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ar-moneygram",
+        "name": "MoneyGram agent",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on photo ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "City you’ll pay in",
+            "placeholder": "e.g. Toronto",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ]
+  }
+}

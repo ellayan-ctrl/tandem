@@ -1,0 +1,9 @@
+# Python server (backend/). Install: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+fastapi>=0.115
+uvicorn[standard]>=0.30
+stellar-sdk[aiohttp]>=13.0
+httpx>=0.27
+cryptography>=43
+python-dotenv>=1.0
+pytest>=8
+certifi>=2024

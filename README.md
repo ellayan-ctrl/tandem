@@ -15,21 +15,33 @@ Users link a **bank account** (simulated sandbox in this demo). TwoWay creates a
 | Step | What happens | Crypto / Soroban? |
 |---|---|---|
 | **Place order** | Server checks the linked bank's available balance (minus reservations for other open orders) and stores the order in SQLite. The sender picks how they'll pay the matched part (linked bank, debit card, Interac, M-Pesa, cash at MoneyGram…). | None |
-| **Match** | FIFO per corridor, partial fills, integer 7-decimal amounts (`server/matching.ts`), one DB transaction. Counterparties are anonymous to each other. Matched volume is settled locally (`server/netting.ts`, simulated rails); if paid from the linked bank, the bank is debited. | None |
-| **Timer runs out** | Now the exact unmatched amount is known. Only that amount is debited from the bank, the treasury sends that much testnet USDC into the invisible wallet (standing in for a bank → USDC on-ramp), the wallet approves the contract, and `payout_remainder` sends it to the recipient (`server/orders.ts`, `server/worker.ts`). | **Yes**, for the unmatched amount only |
+| **Match** | FIFO per corridor, partial fills, integer 7-decimal amounts (`backend/matching.py`), one DB transaction. Counterparties are anonymous to each other. Matched volume is settled locally (`backend/netting.py`, simulated rails) and debited from the payment method chosen to pay it. | None |
+| **Timer runs out** | Now the exact unmatched amount is known. Only that amount is debited from the bank, the treasury sends that much testnet USDC into the invisible wallet (standing in for a bank → USDC on-ramp), the wallet approves the contract, and `payout_remainder` sends it to the recipient (`backend/orders.py`, `backend/worker.py`). | **Yes**, for the unmatched amount only |
 
 Contract: [`soroban/contracts/twoway_settlement`](soroban/contracts/twoway_settlement/src/lib.rs). Admin-only, at most one payout per order id, bounded by the wallet's allowance. The server is custodial in this demo: it holds the invisible wallets' keys (encrypted at rest) and is trusted to choose the recipient and amount from the database.
 
+## Project layout
+
+| Part | Language | Where |
+|---|---|---|
+| Settlement contract | Rust (soroban-sdk) | `soroban/contracts/twoway_settlement/` |
+| Server: API, SQLite order book, matching, netting, Soroban payouts, expiry worker | Python (FastAPI, stellar-sdk) | `backend/`, tests in `tests/` |
+| Front end | JavaScript (React + JSX, Vite, Tailwind) | `src/`, `index.html` |
+| Data shared by server and front end (payment methods, FX rates, remittance averages) | JSON | `shared/` |
+| Contract deploy / treasury setup | Shell, Python | `scripts/` |
+
 ## Run Locally
 
-**Prerequisites:** Node.js 22.5+ (uses built-in `node:sqlite`), Rust with the `wasm32v1-none` target, and the Stellar CLI.
+**Prerequisites:** Python 3.9+, Node.js (for the Vite front-end tooling), Rust with the `wasm32v1-none` target, and the Stellar CLI.
 
-1. Install dependencies: `npm install`
+1. Install dependencies (Python venv in `.venv/` + npm packages): `npm run setup`
 2. Deploy the contract to testnet (creates a funded `twoway-operator` key and writes `OPERATOR_SECRET`, `SETTLEMENT_CONTRACT_ID`, `USDC_CONTRACT_ID` to `.env.local`): `npm run deploy:contract`
-3. Create the testnet USDC treasury (Friendbot + XLM → USDC DEX swap; writes `TREASURY_SECRET`): `npx tsx scripts/setup-treasury.ts 3000`
-4. Run the server + app: `npm run dev` → http://localhost:3000 (SQLite DB in `data/twoway.db`)
+3. Create the testnet USDC treasury (Friendbot + XLM → USDC DEX swap; writes `TREASURY_SECRET`): `npm run setup:treasury -- 3000`
+4. Run the server + app: `npm run dev` → http://localhost:3000. This starts the Python API on :8000 and the Vite dev server on :3000, which proxies `/api`. SQLite DB in `data/twoway.db`; API docs at http://localhost:3000/api/docs.
 5. Click **Link Bank Account**, then send.
 
-Tests: `npm test` (matching engine) and `npm run test:contract` (Soroban contract).
+Production: `npm run build && npm start` serves the API and the built front end from Python on :3000.
+
+Tests: `npm test` (Python: matching, amounts, payment-method validation, wallet encryption, order placement + netting) and `npm run test:contract` (Soroban contract).
 
 Recipients need a Stellar address with a USDC trustline (the Send form's "Use testnet demo address" fills one). Demo counterparties (Transaction History → Load Canonical Scenario, Live Orders → Simulate anonymous opposing order) are demo bank-linked accounts created on first use.

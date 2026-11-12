@@ -1,0 +1,40 @@
+{
+  "$comment": "Indicative FX rates: local currency per 1 USD/USDC. Not live rates.",
+  "rates": {
+    "CAD": {
+      "rate": 1.392,
+      "symbol": "CA$",
+      "name": "Canadian Dollar"
+    },
+    "KES": {
+      "rate": 129.5,
+      "symbol": "KSh",
+      "name": "Kenyan Shilling"
+    },
+    "USD": {
+      "rate": 1,
+      "symbol": "$",
+      "name": "US Dollar"
+    },
+    "EUR": {
+      "rate": 0.942,
+      "symbol": "€",
+      "name": "Euro"
+    },
+    "NGN": {
+      "rate": 1480,
+      "symbol": "₦",
+      "name": "Nigerian Naira"
+    },
+    "PHP": {
+      "rate": 58.45,
+      "symbol": "₱",
+      "name": "Philippine Peso"
+    },
+    "ARS": {
+      "rate": 1050,
+      "symbol": "AR$",
+      "name": "Argentine Peso"
+    }
+  }
+}
