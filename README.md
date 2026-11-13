@@ -1,4 +1,4 @@
-# Tandem <img width="50" height="50" alt="Screenshot 2026-11-12 at 10 38 51 PM" src="https://github.com/user-attachments/assets/b0445a19-d757-4d87-b9eb-32abdf04b7d8" />
+# Tandem <img width="80" height="120" alt="Screenshot 2026-11-12 at 10 38 51 PM" src="https://github.com/user-attachments/assets/b0445a19-d757-4d87-b9eb-32abdf04b7d8" />
 
 
 **Send together, save together.**
