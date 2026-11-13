@@ -73,8 +73,10 @@ export const api = {
   counterpartyOrder: (body) => call('/demo/counterparty-order', { body }),
 
   demoRecipient: (country) => call('/demo/recipient', { body: { country } }),
+  // Close leftover sandbox orders in these countries before a demo (real users' orders are untouched).
+  demoClear: (countries) => call('/demo/clear', { body: { countries } }),
 
-  // Random Test tab: orders between sandbox accounts, and their full details (plus routed legs).
+  // Random tests (Demo & Tests tab): orders between sandbox accounts, and their full details (plus routed legs).
   demoTestOrder: (body) => call('/demo/test-order', { body }),
   demoTestOrders: (ids) => call(`/demo/test-orders?ids=${encodeURIComponent(ids.join(','))}`),
 

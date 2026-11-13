@@ -53,6 +53,7 @@ def create_app(serve_frontend: bool = False) -> FastAPI:
             f = (dist / path).resolve()
             if path and f.is_file() and dist.resolve() in f.parents:
                 return FileResponse(f)
-            return FileResponse(dist / "index.html")
+            # Always revalidate the page itself, so a rebuild shows up on refresh (assets have hashed names).
+            return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
 
     return app

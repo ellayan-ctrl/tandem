@@ -367,6 +367,23 @@ class OrderService:
             for oid in ids:
                 self.db.execute(f"UPDATE orders SET deadline_at = ? WHERE id = ? AND status IN {ACTIVE}", (now, oid))
 
+    def expire_sandbox_orders(self, countries: List[str]) -> int:
+        """Close the matching windows of SANDBOX (demo-account) orders touching these countries, so leftovers
+        from earlier demos can't match a new demo first. Their unmatched parts then pay out as usual. Real
+        users' orders are never touched. Returns how many were closed."""
+        if not countries:
+            return 0
+        now = now_ms()
+        marks = ",".join("?" * len(countries))
+        with transaction(self.db):
+            cur = self.db.execute(
+                f"""UPDATE orders SET deadline_at = ? WHERE status IN {ACTIVE} AND deadline_at > ?
+                      AND account_id IN (SELECT id FROM accounts WHERE is_demo = 1)
+                      AND (from_country IN ({marks}) OR to_country IN ({marks}))""",
+                (now, now, *countries, *countries),
+            )
+        return cur.rowcount
+
     def active_ids_in_pair(self, a: str, b: str) -> List[int]:
         rows = self.db.execute(
             f"""SELECT id FROM orders WHERE status IN {ACTIVE} AND transfer_type IN {MATCHABLE} AND

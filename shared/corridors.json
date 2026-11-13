@@ -1,5 +1,5 @@
 {
-  "$comment": "The country pairs used everywhere in the app (Send, Live Orders, Transaction History, Calculator, Run Demo, Random Test, cash-in/out). Every pair is a corridor in the fee spreadsheets (shared/fees/*.csv); sheetName is the country's name in those sheets. Edit this file to change the pairs app-wide.",
+  "$comment": "The country pairs used everywhere in the app (Send, Live Orders, Transaction History, Calculator, Demo & Tests, cash-in/out). Every pair is a corridor in the fee spreadsheets (shared/fees/*.csv); sheetName is the country's name in those sheets. Edit this file to change the pairs app-wide.",
   "countries": {
     "Canada": { "code": "CA", "flag": "🇨🇦", "currency": "CAD", "sheetName": "Canada", "region": "north-america" },
     "United States": { "code": "US", "flag": "🇺🇸", "currency": "USD", "sheetName": "United States", "region": "north-america" },

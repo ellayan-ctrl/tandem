@@ -383,6 +383,15 @@ def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> AP
         # The counterparty is someone else: the caller only sees it anonymized.
         return {"order": one(req, order), "batches": [serialize_batch(m) for m in matches]}
 
+    @r.post("/demo/clear")
+    async def demo_clear(req: Request):
+        """Before a demo: close leftover sandbox orders in these countries (real users' orders are untouched)."""
+        countries = [str(c) for c in ((await _body(req)).get("countries") or []) if str(c) in REGION_OF]
+        closed = svc.expire_sandbox_orders(countries)
+        if closed:
+            kick_worker()  # pay out their unmatched parts now
+        return {"closed": closed}
+
     @r.post("/demo/recipient")
     async def demo_recipient(req: Request):
         """A demo recipient wallet in a country (has a USDC trustline, so payouts can land). Used by

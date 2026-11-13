@@ -1,4 +1,4 @@
-import { Activity, BookOpen, Landmark, Play } from 'lucide-react';
+import { Activity, BookOpen, Landmark } from 'lucide-react';
 
 import logoUrl from '../assets/tandem-logo.png';
 
@@ -8,7 +8,6 @@ export const Header = ({
   account,
   activeOrdersCount = 0,
   onOpenAccountModal,
-  onOpenDemoModal,
   latestLedger,
   onOpenTour,
   contractId,
@@ -19,7 +18,7 @@ export const Header = ({
     { id: 'mine', label: 'My Transactions' },
     { id: 'corridors', label: 'Transaction History' },
     { id: 'calculator', label: 'Calculator' },
-    { id: 'random', label: 'Random Test' },
+    { id: 'demo', label: 'Demo & Tests' },
   ];
 
   return (
@@ -61,17 +60,6 @@ export const Header = ({
 
           {/* Zone 3: Wallet & Network */}
           <div data-tour="wallet-console" className="flex items-center gap-2 shrink-0">
-            {onOpenDemoModal && (
-              <button
-                onClick={onOpenDemoModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
-                title="Run an automatic demo on Stellar testnet: send 10, someone sends 8 back, after 15 seconds only the unmatched 2 settles on-chain"
-              >
-                <Play className="w-3 h-3 fill-current shrink-0" />
-                <span>Run Demo</span>
-              </button>
-            )}
-
             {contractId && (
               <a
                 href={`https://stellar.expert/explorer/testnet/contract/${contractId}`}

@@ -11,6 +11,7 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 // Final states. (payout_failed is not final: the server retries it automatically, 30 s apart.)
 const DONE = ['fallback_executed', 'refunded', 'remainder_converted', 'settled'];
 const GIVE_UP_MS = 150_000; // after the last deadline
+const QUIET_WAIT_MS = 45_000; // longest the demo waits for earlier orders in its countries to finish
 const isOpen = (o) => o.status === 'open' || o.status === 'partially_matched';
 
 /**
@@ -41,8 +42,9 @@ const SCENARIOS = {
   },
 };
 
-export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onRefresh, onNavigate, onSelectOrder }) => {
-  const [scenario, setScenario] = useState(null);
+/** One guided demo (scenario 'two' or 'three'), run inside the floating progress card. Starts on mount. */
+export const AutoDemo = ({ scenario: fixedScenario, account, corridors, ensureAccount, onRefresh, onSelectOrder }) => {
+  const [scenario, setScenario] = useState(null); // set once a run starts
   const [steps, setSteps] = useState([]);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState([]); // [{ label, order }]
@@ -50,19 +52,14 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
   const [error, setError] = useState(null);
   const runId = useRef(0); // bumping it stops the current run
 
+  // Starts as soon as the card opens; stops if the card is closed mid-run.
   useEffect(() => {
-    if (!open) {
+    run(fixedScenario);
+    return () => {
       runId.current += 1;
-      setScenario(null);
-      setSteps([]);
-      setResults([]);
-      setSummary(null);
-      setError(null);
-      setRunning(false);
-    }
-  }, [open]);
-
-  if (!open) return null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const flagOf = {};
   corridors.forEach((c) => {
@@ -117,12 +114,29 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
       }
       setStep(0, { state: 'done', note: `${acct.displayName}, ${flagOf[A]} ${A}.` });
 
-      // You send 10 A -> B.
-      setStep(1, { state: 'active', note: `Preparing a recipient in ${flagOf[B]} ${B}...` });
+      // You send 10 A -> B. First make sure no earlier orders in these countries can match first (matching
+      // is first-come-first-served), so the numbers come out exactly as described.
+      const used = which === 'two' ? [A, B] : [A, B, C];
+      setStep(1, { state: 'active', note: `Clearing leftover sandbox orders in ${used.join(', ')}...` });
+      await api.demoClear(used);
+      const waitStart = Date.now();
+      let waiting = [];
+      while (true) {
+        stop();
+        const now = Date.now();
+        waiting = (await api.orders()).filter(
+          (o) => isOpen(o) && o.remainingAmount > 0 && o.deadlineTimestamp > now && (used.includes(o.fromCountry) || used.includes(o.toCountry)),
+        );
+        if (!waiting.length || now - waitStart > QUIET_WAIT_MS) break;
+        const left = Math.ceil((Math.min(...waiting.map((o) => o.deadlineTimestamp)) - now) / 1000);
+        setStep(1, {
+          note: `Waiting for ${waiting.length} earlier order${waiting.length > 1 ? 's' : ''} in these countries to finish (next timer ends in ${left}s), so nothing else can match first...`,
+        });
+        await pause(1500);
+      }
+      setStep(1, { note: `Preparing a recipient in ${flagOf[B]} ${B}...` });
       const recipient = await api.demoRecipient(B);
       stop();
-      const before = await api.orders();
-      const ahead = (frm, to) => before.filter((o) => o.fromCountry === frm && o.toCountry === to && isOpen(o) && o.remainingAmount > 0).length;
       const draft = {
         recipientName: recipient.name,
         recipientAddress: recipient.address,
@@ -147,19 +161,23 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
       }
       stop();
       const myId = placed.order.id;
-      onNavigate('dashboard');
       await onRefresh();
-      setStep(1, { state: 'done', note: `Order ${myId}: ${A} → ${B}. Nothing charged and nothing on-chain yet.` });
+      setStep(1, {
+        state: 'done',
+        note:
+          `Order ${myId}: ${A} → ${B}. Nothing charged and nothing on-chain yet.` +
+          (waiting.length ? ` Note: ${waiting.length} earlier order${waiting.length > 1 ? 's are' : ' is'} still waiting in these countries and may match first.` : ''),
+      });
       await pause(2000);
       stop();
 
+      // The anonymous counterparties use the same short window, so nothing of theirs lingers in the book.
       const counterparty = (frm, to, amount) =>
-        api.counterpartyOrder({ fromCountry: frm, toCountry: to, fromFlag: flagOf[frm], toFlag: flagOf[to], amount: amount.toFixed(2), deadlineMinutes: 30 });
-      const queueNote = (n) => (n ? ` (${n} older order${n > 1 ? 's are' : ' is'} ahead in the queue and match first)` : '');
+        api.counterpartyOrder({ fromCountry: frm, toCountry: to, fromFlag: flagOf[frm], toFlag: flagOf[to], amount: amount.toFixed(2), deadlineMinutes: WINDOW_MINUTES });
 
       let watch = [myId];
       if (which === 'two') {
-        setStep(2, { state: 'active', note: `An anonymous sender in ${B} sends $8.00 to ${A}${queueNote(ahead(A, B))}...` });
+        setStep(2, { state: 'active', note: `An anonymous sender in ${B} sends $8.00 to ${A}...` });
         await counterparty(B, A, 8);
         stop();
         await onRefresh();
@@ -171,7 +189,7 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
       } else {
         setStep(2, {
           state: 'active',
-          note: `An anonymous sender in ${B} sends $8.00 to ${C}${queueNote(before.filter((o) => o.toCountry === B && isOpen(o) && o.remainingAmount > 0).length)}...`,
+          note: `An anonymous sender in ${B} sends $8.00 to ${C}...`,
         });
         await counterparty(B, C, 8);
         stop();
@@ -192,7 +210,7 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
         await pause(2000);
         stop();
 
-        setStep(3, { state: 'active', note: `An anonymous sender in ${C} sends $6.00 to ${A}${queueNote(ahead(A, C))}...` });
+        setStep(3, { state: 'active', note: `An anonymous sender in ${C} sends $6.00 to ${A}...` });
         await counterparty(C, A, 6);
         stop();
         await onRefresh();
@@ -237,19 +255,32 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
       setStep(waitStep, { state: 'done', note: 'Windows closed.' });
 
       // Result.
+      // Everything below is computed from the actual orders, not fixed text.
       const onChain = orders.reduce((s, o) => s + (o.status === 'fallback_executed' ? o.payoutAmount ?? 0 : 0), 0);
-      const total = which === 'two' ? 18 : 24;
+      const flows = which === 'two' ? [[A, B, 10], [B, A, 8]] : [[A, B, 10], [B, C, 8], [C, A, 6]];
+      const net = {};
+      flows.forEach(([f, t, v]) => {
+        net[t] = (net[t] ?? 0) + v;
+        net[f] = (net[f] ?? 0) - v;
+      });
+      const least = Object.values(net).reduce((s, v) => s + Math.max(0, v), 0);
+      const total = flows.reduce((s, [, , v]) => s + v, 0);
+      const mineFinal = orders.find((o) => o.id === myId);
       setResults(
         orders.map((o) => ({
           label: o.id === myId ? `${A} → ${B}` : `${A} → ${C} (routed)`,
           order: o,
         })),
       );
+      const isLeast = Math.abs(onChain - least) < 0.005;
       setSummary(
-        `${usd(onChain)} moved on-chain out of ${usd(total)} sent by everyone. ` +
-          (which === 'two'
-            ? 'The matched $8.00 never touched the blockchain.'
-            : `That's the least possible: ${B} and ${C} each receive $2.00 more than they send; everything else cancelled out locally.`),
+        `${usd(onChain)} moved on-chain out of ${usd(total)} sent by everyone in this demo. ` +
+          (isLeast
+            ? `That's the least possible (${Object.entries(net)
+                .filter(([, v]) => v > 0)
+                .map(([c, v]) => `${c} takes in ${usd(v)} more than it sends`)
+                .join(', ')}); everything else, including your ${usd(mineFinal?.matchedAmount)} matched, was paid locally.`
+            : `The least possible was ${usd(least)}: other orders in the book took part in the matching this time.`),
       );
       setStep(waitStep + 1, { state: 'done', note: '' });
     } catch (e) {
@@ -263,36 +294,7 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
   };
 
   return (
-    <div
-      className="fixed bottom-4 left-4 z-40 w-[calc(100%-2rem)] sm:w-[420px] max-h-[85vh] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl text-xs"
-      role="dialog"
-      aria-label="Auto demo"
-    >
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
-        <span className="font-semibold text-slate-900 dark:text-white">
-          Auto demo{scenario ? ` · ${SCENARIOS[scenario].label}, 15-second windows` : ' on Stellar testnet'}
-        </span>
-        <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={running ? 'Stop demo' : 'Close demo'}>
-          <X className="w-4 h-4 text-slate-500" />
-        </button>
-      </div>
-
-      {!scenario && (
-        <div className="p-4 space-y-2">
-          {Object.entries(SCENARIOS).map(([id, s]) => (
-            <button
-              key={id}
-              onClick={() => run(id)}
-              className="w-full text-left p-3 rounded-md border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
-            >
-              <span className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white">
-                <Play className="w-3 h-3" /> {s.label}
-              </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">{s.blurb}</span>
-            </button>
-          ))}
-        </div>
-      )}
+    <section className="text-xs" aria-label={`Guided demo, ${SCENARIOS[fixedScenario].label}`}>
 
       {scenario && (
         <ol className="px-4 py-3 space-y-2.5">
@@ -342,14 +344,11 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
               <button onClick={() => run(scenario)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 font-medium">
                 <Play className="w-3 h-3" /> Run again
               </button>
-              <button onClick={() => setScenario(null)} className="px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 font-medium">
-                Other demo
-              </button>
             </span>
           )}
           {running && <span className="text-[11px] text-slate-400 ml-auto">Running on Stellar testnet…</span>}
         </div>
       )}
-    </div>
+    </section>
   );
 };

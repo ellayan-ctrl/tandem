@@ -8,8 +8,8 @@ import { OrderReceiptModal } from './components/OrderReceiptModal';
 import { BankAccountModal } from './components/BankAccountModal';
 import { GuidedTourModal } from './components/GuidedTourModal';
 import { MyTransactions } from './components/MyTransactions';
-import { AutoDemo } from './components/AutoDemo';
-import { RandomTest } from './components/RandomTest';
+import { DemoTests } from './components/DemoTests';
+import { RUN_OPTIONS, RunCard } from './components/RunCard';
 import { CORRIDORS, FLAGS, partnersOf } from './data/corridors';
 
 import { fetchLiveNetworkStatus } from './services/stellarTestnet';
@@ -31,7 +31,14 @@ export default function App() {
   };
   const [latestLedger, setLatestLedger] = useState(0);
   const [contractId, setContractId] = useState(null);
-  const [demoOpen, setDemoOpen] = useState(false);
+  // The demo/test running in the floating card (Demo & Tests tab), and finished random-test runs.
+  const [activeRun, setActiveRun] = useState(null); // { id, key }
+  const [testHistory, setTestHistory] = useState([]);
+  const watchTabOf = (id) => RUN_OPTIONS.find((o) => o.id === id)?.watchTab ?? 'dashboard';
+  const startRun = (id) => {
+    setActiveRun({ id, key: Date.now() }); // a new key restarts the card's runner
+    setActiveTab(watchTabOf(id)); // watch it happen live
+  };
 
   // Auto demo with no account linked: link a sandbox Canada account for this browser.
   const ensureDemoAccount = async () => {
@@ -327,18 +334,6 @@ export default function App() {
         latestLedger={latestLedger}
         onOpenTour={() => setTourOpen(true)}
         contractId={contractId}
-        onOpenDemoModal={() => setDemoOpen(true)}
-      />
-
-      <AutoDemo
-        open={demoOpen}
-        onClose={() => setDemoOpen(false)}
-        account={account}
-        corridors={CORRIDORS}
-        ensureAccount={ensureDemoAccount}
-        onRefresh={() => Promise.all([refreshOrders(), refreshAccount()])}
-        onNavigate={setActiveTab}
-        onSelectOrder={(order) => setInspectingOrder(order)}
       />
 
       {/* Main Viewport Content */}
@@ -391,12 +386,22 @@ export default function App() {
 
         {activeTab === 'calculator' && <NettingCalculator corridors={CORRIDORS} />}
 
-        {/* Kept mounted so a running test survives switching tabs. */}
-        <div hidden={activeTab !== 'random'}>
-          <RandomTest corridors={CORRIDORS} />
-        </div>
-
+        {activeTab === 'demo' && (
+          <DemoTests activeRun={activeRun} onRun={startRun} onShowRun={() => setActiveTab(watchTabOf(activeRun.id))} testHistory={testHistory} />
+        )}
       </main>
+
+      {/* The running demo/test: steps and progress, on top of whichever tab shows it live. */}
+      <RunCard
+        run={activeRun}
+        onClose={() => setActiveRun(null)}
+        account={account}
+        corridors={CORRIDORS}
+        ensureAccount={ensureDemoAccount}
+        onRefresh={() => Promise.all([refreshOrders(), refreshAccount()])}
+        onSelectOrder={(order) => setInspectingOrder(order)}
+        onFinished={(r) => setTestHistory((h) => [r, ...h])}
+      />
 
       {/* Settlement Audit Report & Receipt Modal */}
       <OrderReceiptModal
