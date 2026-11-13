@@ -21,7 +21,7 @@ export default defineConfig(() => ({
     proxy: {
       '/api': { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false },
     },
-    // HMR is disabled in AI Studio via DISABLE_HMR env var.
+    // Set DISABLE_HMR=true to turn off hot reload.
     hmr: process.env.DISABLE_HMR !== 'true',
     // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
     watch: process.env.DISABLE_HMR === 'true' ? null : {},

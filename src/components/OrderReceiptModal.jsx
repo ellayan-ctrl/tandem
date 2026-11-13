@@ -124,7 +124,7 @@ export const OrderReceiptModal = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                Stellar Horizon Ledger #{latestLedger} · Soroban Escrow #{order.escrowContractId}
+                Stellar Horizon Ledger #{latestLedger} · Settlement contract {order.escrowContractId}
               </p>
             </div>
           </div>

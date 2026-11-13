@@ -1,8 +1,0 @@
-{
-  "name": "Remix TwoWay Stellar — Cross-Border USDC Netting \u0026 Matching",
-  "description": "Two-Way Street cross-border USDC transfer matching protocol on Stellar \u0026 Soroban with peer-to-peer escrow, adaptive fallback routing, and corridor netting.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
