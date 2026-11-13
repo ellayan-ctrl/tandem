@@ -15,7 +15,7 @@
     "test:contract": "cd soroban && cargo test",
     "deploy:contract": "scripts/deploy-contract.sh",
     "setup:treasury": ".venv/bin/python scripts/setup_treasury.py",
-    "test:testnet": ".venv/bin/python scripts/testnet_demo.py"
+    "test:testnet": ".venv/bin/python scripts/verify_testnet.py"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.4.0",

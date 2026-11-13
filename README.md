@@ -61,7 +61,7 @@ For production: `npm run build && npm start`.
 |---|---|
 | `npm test` | 42 Python tests: matching, chain routing, balance holds, validation, wallet encryption |
 | `npm run test:contract` | 11 Soroban contract tests: deadline, amounts, double settlement, allowance, pause, auth |
-| `npm run test:testnet` | End to end on Testnet (app must be running): real wallets and USDC, a partial match, a chain route, then closes the timers and verifies on Horizon that only the unmatched amounts moved. Prints Stellar Expert links. |
+| `npm run test:testnet` | End to end on Testnet (app must be running), with the real timer. Verifies the result **directly on the blockchain**: the contract's own settlement record, the transaction on Horizon, and the recipient's balance. Prints Stellar Expert links. Add `-- --check` to check your setup first, `-- --routing` to also test chain routing. See [docs/TESTING.md](docs/TESTING.md). |
 
 In the app, **Live Orders** has demo buttons: *Simulate anonymous opposing order* and *Simulate onward order (chain)*. For a custom recipient, the address needs a USDC trustline; the Send form's "Use testnet demo address" fills one.
 

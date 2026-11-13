@@ -117,6 +117,11 @@ async def paid_amount(onchain_id: int) -> Optional[int]:
     return None if v is None else int(v)
 
 
+async def stats() -> dict:
+    """The contract's running totals: settlements, total_volume, matched_volume, settled_volume (units)."""
+    return await _simulate_read(config.settlement_contract_id, "stats")
+
+
 async def settlement(onchain_id: int) -> Optional[dict]:
     """The contract's settlement record for an order id (total, matched, remainder, deadline, ...)."""
     return await _simulate_read(config.settlement_contract_id, "settlement", _u64(onchain_id))
