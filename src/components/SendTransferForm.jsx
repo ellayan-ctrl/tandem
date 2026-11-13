@@ -6,13 +6,17 @@ import { isValidStellarPublicKey } from '../services/stellarTestnet';
 import { MethodSelect } from './MethodSelect';
 import { SavingsComparison } from './SavingsComparison';
 
-/** Longest matching window the server accepts (7 days). */
+/** Longest and shortest matching windows the server accepts (7 days, 15 seconds). */
 const MAX_WINDOW_MINUTES = 7 * 24 * 60;
+const MIN_WINDOW_MINUTES = 0.25;
 /** Slider stops, in minutes: fine-grained for short windows, coarser for long ones. */
 const WINDOW_STOPS = [
-  1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 960, 1440, 2160, 2880, 4320, 5760, 7200, 8640, 10080,
+  0.25, 0.5, 0.75, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 960, 1440, 2160, 2880, 4320, 5760, 7200,
+  8640, 10080,
 ];
 const WINDOW_PRESETS = [
+  { label: '15s', minutes: 0.25 },
+  { label: '30s', minutes: 0.5 },
   { label: '15m', minutes: 15 },
   { label: '30m', minutes: 30 },
   { label: '1h', minutes: 60 },
@@ -22,12 +26,14 @@ const WINDOW_PRESETS = [
 /** Index of the slider stop closest to `minutes` (so presets and exact values move the slider too). */
 const nearestStop = (minutes) =>
   WINDOW_STOPS.reduce((best, m, i) => (Math.abs(m - minutes) < Math.abs(WINDOW_STOPS[best] - minutes) ? i : best), 0);
-/** 45 -> "45 min", 90 -> "1 h 30 min", 2160 -> "1 day 12 h" */
+/** 0.5 -> "30 s", 45 -> "45 min", 90 -> "1 h 30 min", 2160 -> "1 day 12 h" */
 const formatWindow = (minutes) => {
-  const d = Math.floor(minutes / 1440);
-  const h = Math.floor((minutes % 1440) / 60);
-  const m = minutes % 60;
-  const parts = [d && `${d} day${d > 1 ? 's' : ''}`, h && `${h} h`, m && `${m} min`].filter(Boolean);
+  const total = Math.round(minutes * 60);
+  const d = Math.floor(total / 86400);
+  const h = Math.floor((total % 86400) / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const parts = [d && `${d} day${d > 1 ? 's' : ''}`, h && `${h} h`, m && `${m} min`, s && `${s} s`].filter(Boolean);
   return parts.join(' ') || '0 min';
 };
 
@@ -48,8 +54,11 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
   const [transferMode, setTransferMode] = useState('matched_pool');
 
   // Deadline selection
-  // Matching window length in minutes (1 min .. 7 days, the server's limit).
+  // Matching window length in minutes (15 s .. 7 days, the server's limit; 0.5 = 30 seconds).
   const [windowMinutes, setWindowMinutes] = useState(60);
+  // What's typed in the "Exact" box; follows the slider and presets.
+  const [windowInput, setWindowInput] = useState('60');
+  useEffect(() => setWindowInput(String(+windowMinutes.toFixed(2))), [windowMinutes]);
 
   // Unmatched remainder always settles in USDC on Soroban.
   const remainderPolicy = 'direct_stellar_fallback';
@@ -434,7 +443,7 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
                 className="w-full accent-slate-900 dark:accent-white cursor-pointer"
               />
               <div className="flex justify-between text-[10px] text-slate-400 font-mono-numbers">
-                <span>1 min</span>
+                <span>15 s</span>
                 <span>1 h</span>
                 <span>6 h</span>
                 <span>1 day</span>
@@ -464,12 +473,21 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
                 Exact:
                 <input
                   type="number"
-                  min="1"
+                  min={MIN_WINDOW_MINUTES}
                   max={MAX_WINDOW_MINUTES}
-                  value={windowMinutes}
+                  step="0.25"
+                  value={windowInput}
                   onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (Number.isFinite(v)) setWindowMinutes(Math.min(MAX_WINDOW_MINUTES, Math.max(1, v)));
+                    // Minutes, decimals allowed (0.5 = 30 seconds). Clamped on blur so typing "0.5" works.
+                    setWindowInput(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (Number.isFinite(v) && v >= MIN_WINDOW_MINUTES && v <= MAX_WINDOW_MINUTES) setWindowMinutes(Math.round(v * 60) / 60);
+                  }}
+                  onBlur={() => {
+                    const v = parseFloat(windowInput);
+                    const clamped = Number.isFinite(v) ? Math.min(MAX_WINDOW_MINUTES, Math.max(MIN_WINDOW_MINUTES, v)) : windowMinutes;
+                    setWindowMinutes(Math.round(clamped * 60) / 60);
+                    setWindowInput(String(+(Math.round(clamped * 60) / 60).toFixed(2)));
                   }}
                   className="w-20 px-2 py-1 text-xs font-mono font-medium border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900"
                 />

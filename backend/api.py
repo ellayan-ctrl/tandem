@@ -20,7 +20,7 @@ from .config import config
 from .errors import ChainError, HttpError
 from .orders import OrderService
 from .pricing import overseas_pricing
-from .ramps import ramps_for
+from .ramps import REGION_OF, ramps_for
 from .shared_data import FUNDING_KINDS, find_provider, mask_details
 
 log = logging.getLogger("twoway.api")
@@ -382,6 +382,16 @@ def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> AP
         })
         # The counterparty is someone else: the caller only sees it anonymized.
         return {"order": one(req, order), "batches": [serialize_batch(m) for m in matches]}
+
+    @r.post("/demo/recipient")
+    async def demo_recipient(req: Request):
+        """A demo recipient wallet in a country (has a USDC trustline, so payouts can land). Used by
+        the website's auto demo. Created once; the first call takes a few seconds."""
+        country = str((await _body(req)).get("country") or "")
+        if country not in REGION_OF:  # the app's countries
+            raise HttpError(400, "Unknown country.")
+        acct = await accounts.demo_account(country)
+        return {"name": acct["display_name"], "address": acct["wallet_public"]}
 
     @r.post("/demo/reset")
     async def reset(req: Request):

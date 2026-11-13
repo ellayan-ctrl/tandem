@@ -25,8 +25,11 @@ from .shared_data import find_provider, fx_for, validate_selection
 ACTIVE = "('open','partially_matched')"
 # Order types that wait in the book: user orders and routed legs created by chain routing.
 MATCHABLE = "('matched_pool','routed')"
-# A chain is only formed if both timers have at least this long left.
+# A chain is only formed if both timers have at least this long left. (So windows under a minute
+# still match directly but are never chain-routed.)
 MIN_ROUTE_WINDOW_MS = 60_000
+# Shortest matching window: 15 seconds.
+MIN_WINDOW_MINUTES = 0.25
 POLICIES = ("direct_stellar_fallback", "refund_to_sender", "convert_to_fiat_bank")
 POLICY_ACTION = {"direct_stellar_fallback": "payout", "refund_to_sender": "release", "convert_to_fiat_bank": "convert"}
 UNRESOLVED = ("open", "partially_matched", "payout_failed")
@@ -83,7 +86,7 @@ class OrderService:
         currency, rate = fx_for(account["country"])
         need_minor = units_to_minor(d["amountUnits"], rate)
         created = now_ms()
-        deadline_at = created + d["deadlineMinutes"] * 60_000
+        deadline_at = created + round(d["deadlineMinutes"] * 60_000)
 
         with transaction(self.db):
             fresh = accounts.get(account["id"])
@@ -151,9 +154,16 @@ class OrderService:
             raise bad("Choose two different countries.")
         if d.get("remainderPolicy") not in POLICIES:
             raise bad("Invalid remainderPolicy")
+        # Matching window: 15 seconds .. 7 days, in whole seconds (e.g. 0.5 = 30 seconds).
         minutes = _number(d.get("deadlineMinutes"))
-        if not math.isfinite(minutes) or not minutes.is_integer() or minutes < 1 or minutes > 7 * 24 * 60:
-            raise bad("deadlineMinutes must be 1..10080")
+        if (
+            not math.isfinite(minutes)
+            or abs(minutes * 60 - round(minutes * 60)) > 1e-6
+            or minutes < MIN_WINDOW_MINUTES
+            or minutes > 7 * 24 * 60
+        ):
+            raise bad("deadlineMinutes must be 0.25..10080 (15 seconds to 7 days, whole seconds)")
+        minutes = int(minutes) if minutes.is_integer() else round(minutes * 60) / 60
         try:
             amount_units = to_units(d.get("amount") if d.get("amount") is not None else "")
         except ValueError as e:
@@ -172,7 +182,7 @@ class OrderService:
                 "providerId": provider["id"],
                 "details": {f["key"]: str(d["fundingMethod"]["details"][f["key"]]).strip() for f in provider["fields"]},
             }
-        return {**d, "deadlineMinutes": int(minutes), "amountUnits": amount_units, "fundingMethod": funding_method}
+        return {**d, "deadlineMinutes": minutes, "amountUnits": amount_units, "fundingMethod": funding_method}
 
     # ----------------------------------------------------------- queries
 
@@ -326,7 +336,7 @@ class OrderService:
                     1 + secrets.randbelow(2**47 - 1),
                     x["sender_name"], x["sender_address"], y["recipient_name"], y["recipient_address"],
                     x["from_country"], y["to_country"], x["from_flag"], y["to_flag"],
-                    f.amount, f.amount, now, max(1, -(-(deadline - now) // 60_000)), deadline,
+                    f.amount, f.amount, now, round(max(1_000, deadline - now) / 60_000, 4), deadline,
                     f"Routed: {x['from_country']} → {f.hub} and {f.hub} → {y['to_country']} became one {x['from_country']} → {y['to_country']} transfer.",
                     x["funding_method_json"], x["account_id"], x["fiat_currency"], x["fx_rate"],
                     x["bank_id"], x["remainder_bank_id"], x["id"], y["id"], f.hub,

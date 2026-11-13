@@ -1,4 +1,4 @@
-import { BookOpen, Landmark, Play } from 'lucide-react';
+import { Activity, BookOpen, Landmark, Play } from 'lucide-react';
 
 export const Header = ({
   activeTab,
@@ -9,6 +9,7 @@ export const Header = ({
   onOpenDemoModal,
   latestLedger,
   onOpenTour,
+  contractId,
 }) => {
   const navTabs = [
     { id: 'send', label: 'Send' },
@@ -62,11 +63,29 @@ export const Header = ({
               <button
                 onClick={onOpenDemoModal}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
-                title="Run Live 2-Institution Netting Demo on Stellar Testnet (10 vs 6 USDC -> 4 USDC Net)"
+                title="Run an automatic demo on Stellar testnet: send 10, someone sends 8 back, after 15 seconds only the unmatched 2 settles on-chain"
               >
                 <Play className="w-3 h-3 fill-current shrink-0" />
                 <span>Run Demo</span>
               </button>
+            )}
+
+            {contractId && (
+              <a
+                href={`https://stellar.expert/explorer/testnet/contract/${contractId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 font-medium transition-colors"
+                title="Open the settlement contract on Stellar Expert: every unmatched remainder sent on-chain, live"
+                aria-label="Live blockchain feed on Stellar Expert (opens in a new tab)"
+              >
+                <span className="relative flex w-2 h-2" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+                </span>
+                <Activity className="w-3.5 h-3.5 text-slate-500 sm:hidden" />
+                <span className="hidden sm:inline">Live on Stellar Expert</span>
+              </a>
             )}
 
             {onOpenTour && (

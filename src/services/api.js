@@ -72,5 +72,7 @@ export const api = {
   // ---- demo
   counterpartyOrder: (body) => call('/demo/counterparty-order', { body }),
 
+  demoRecipient: (country) => call('/demo/recipient', { body: { country } }),
+
   resetDemo: (seedCanonical) => call('/demo/reset', { body: { seedCanonical } }),
 };

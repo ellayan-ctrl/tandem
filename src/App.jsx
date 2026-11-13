@@ -9,6 +9,7 @@ import { OrderReceiptModal } from './components/OrderReceiptModal';
 import { BankAccountModal } from './components/BankAccountModal';
 import { GuidedTourModal } from './components/GuidedTourModal';
 import { MyTransactions } from './components/MyTransactions';
+import { AutoDemo } from './components/AutoDemo';
 import { CORRIDORS } from './data/mockData';
 
 import { fetchLiveNetworkStatus } from './services/stellarTestnet';
@@ -29,6 +30,30 @@ export default function App() {
     setAccountModalOpen(true);
   };
   const [latestLedger, setLatestLedger] = useState(0);
+  const [contractId, setContractId] = useState(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+
+  // Auto demo with no account linked: link a sandbox Canada account for this browser.
+  const ensureDemoAccount = async () => {
+    const res = await api.linkBank({
+      displayName: 'Demo User',
+      country: 'Canada',
+      bankProviderId: 'ca-rbc',
+      bankDetails: { payerName: 'Demo User', transit: '12345', institution: '003', accountNumber: '7654321' },
+      startingBalance: 500,
+    });
+    setAccountToken(res.token);
+    setAccount(res.account);
+    return res.account;
+  };
+
+  // The settlement contract this server uses (for the header's Stellar Expert link).
+  useEffect(() => {
+    api
+      .config()
+      .then((c) => setContractId(c.settlementContractId))
+      .catch(() => {});
+  }, []);
   const [inspectingOrder, setInspectingOrder] = useState(null);
   const [toastNotification, setToastNotification] = useState(null);
   const [autoMatchEnabled, setAutoMatchEnabled] = useState(true);
@@ -138,7 +163,7 @@ export default function App() {
       fromFlag: newOrder.fromFlag,
       toFlag: newOrder.toFlag,
       amount: newOrder.amount.toFixed(7),
-      deadlineMinutes: Math.max(1, newOrder.deadlineMinutes),
+      deadlineMinutes: Math.max(0.25, newOrder.deadlineMinutes),
       bankId: newOrder.bankId,
       remainderBankId: newOrder.remainderBankId,
       transferType: direct ? 'direct_instant' : 'matched_pool',
@@ -304,6 +329,19 @@ export default function App() {
         onOpenAccountModal={() => openAccountModal()}
         latestLedger={latestLedger}
         onOpenTour={() => setTourOpen(true)}
+        contractId={contractId}
+        onOpenDemoModal={() => setDemoOpen(true)}
+      />
+
+      <AutoDemo
+        open={demoOpen}
+        onClose={() => setDemoOpen(false)}
+        account={account}
+        corridors={CORRIDORS}
+        ensureAccount={ensureDemoAccount}
+        onRefresh={() => Promise.all([refreshOrders(), refreshAccount()])}
+        onNavigate={setActiveTab}
+        onSelectOrder={(order) => setInspectingOrder(order)}
       />
 
       {/* Main Viewport Content */}
