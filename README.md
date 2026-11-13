@@ -124,11 +124,19 @@ Two opposite transfers without Tandem cost four conversion fees and two border c
 
 ## Business model
 
-Tandem works best at scale, because more transfers in both directions means more matches. Business users who frequently send bulk transfers in both directions of a country pair make a large share of retail matching possible.
+Tandem works best at scale, because more transfers in both directions means more matches. Businesses that send large, frequent batches in both directions of a corridor add volume to both sides. That lets more retail transfers be matched instantly, with no cross-border settlement or FX conversion.
 
-- **Where the revenue comes from.** We position Tandem first as an aggregator for existing money transfer operators (MTOs), and ideally sell the platform to agencies and anchors.
-- **How users benefit.** Lower fees on matched transfers, and no crypto wallet required.
-- **How agencies and anchors benefit.** *TODO: spell out why agencies and anchors would support this, for example less demand to convert crypto into cash, and a new service built for their community at lower fees.*
+- **Staying funded.** We sell first to money transfer operators (MTOs) and agencies, as an aggregator and netting layer. They already have customers and licenses, so we skip retail acquisition costs. A small per-transaction or SaaS fee brings in revenue from the first deal, and a few anchor clients can cover our runway.
+- **How users benefit.** Lower fees, better exchange rates, and faster transfers, with no crypto wallet required. Every new user, in either direction, improves matching for everyone else.
+- **How agencies and anchors benefit.** They cut pre-funding and FX costs and improve their liquidity. They can pass the savings on as cheaper transfers or earn a share of the fees, and they keep their brand and customers. In return, they provide transaction volume, local payout, and compliance coverage.
+
+## Future features and opportunities
+
+- **Tandem as an API.** We plan to turn the matching engine into an API, so any MTO, agency, or app can plug Tandem into its existing transfer flow instead of switching platforms.
+- **Partnerships with financial services that already offer transfers.** Banks, fintechs, and mobile money providers already have the customers and transfer features. By building on what they offer, we add matching without asking users to change how they send money, and every partner adds volume that improves matches for everyone.
+- **Multi-agency matching.** Matching is best when several transfer agencies use it together, so we will partner with or sell the platform to agencies and add crypto exchange as a new, lower-fee service built for the community.
+- **Anchor integrations.** Anchors can link user accounts so people can quickly convert between digital currency and cash when a transfer is sent.
+- **B2B cross-border transfers.** Bulk payments become cheaper and faster, and the two-way business volume also feeds retail matching.
 
 ---
 
