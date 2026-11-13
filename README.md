@@ -17,7 +17,7 @@ The real hurdle is everything around it:
 - **Accessibility.** Using blockchain to send money still means setting up wallets and learning crypto tooling.
 - **Conversion costs.** The sender pays to convert cash into transferable coins, and the recipient pays again to convert those coins back into usable cash.
 
-These costs fall hardest on people who send small amounts often. These costs fall hardest on people who send small amounts often. Our launch corridor is the UAE and the Philippines. The UAE is home to roughly 975,000 Filipinos, and it accounts for about 4.6% of the cash remittances sent to the Philippines, out of $35.63 billion in 2025, or 7.3% of the country’s GDP. That works out to roughly $1.6 billion a year from the UAE alone, and UAE cash remittances were up 4.3% year on year in the first half of 2026.
+ These costs fall hardest on people who send small amounts often. Our launch corridor is the UAE and the Philippines. The UAE is home to roughly 975,000 Filipinos, and it accounts for about 4.6% of the cash remittances sent to the Philippines, out of $35.63 billion in 2025, or 7.3% of the country’s GDP. That works out to roughly $1.6 billion a year from the UAE alone, and UAE cash remittances were up 4.3% year on year in the first half of 2026.
 
 ---
 
