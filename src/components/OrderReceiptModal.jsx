@@ -34,6 +34,28 @@ export const OrderReceiptModal = ({
 
   const percent = order.amount > 0 ? (order.matchedAmount / order.amount) * 100 : 0;
   const isPending = order.status === 'open' || order.status === 'partially_matched';
+  // Once a remainder is resolved the server zeroes `remainingAmount` and records what happened in
+  // `payoutAmount`, so the unmatched part is whichever of the two is set.
+  const unmatchedAmount = order.remainingAmount > 0 ? order.remainingAmount : (order.payoutAmount ?? 0);
+  const usd = (v) => `$${v.toFixed(2)}`;
+  // What the unmatched part became, per status.
+  const unmatched = {
+    open: { label: 'Unmatched, still waiting', usdc: false },
+    partially_matched: { label: 'Unmatched, still waiting', usdc: false },
+    payout_pending: { label: 'Being sent as USDC via Stellar Blockchain', usdc: true },
+    payout_failed: { label: 'Unmatched, payout failed (will retry)', usdc: false },
+    fallback_executed: { label: 'Sent as USDC via Stellar Blockchain', usdc: true },
+    remainder_converted: { label: 'Converted to local money (simulated)', usdc: false },
+    refunded: { label: 'Released, nothing was charged', usdc: false },
+    settled: { label: 'Unmatched', usdc: false },
+  }[order.status] ?? { label: 'Unmatched', usdc: false };
+  const principalNote = isPending
+    ? 'Nothing has been charged yet'
+    : order.matchedAmount > 0 && unmatchedAmount > 0
+      ? `${usd(order.matchedAmount)} matched locally · ${usd(unmatchedAmount)} unmatched`
+      : order.matchedAmount > 0
+        ? 'Fully matched locally'
+        : 'None of it matched';
   const remainingMs = Math.max(0, order.deadlineTimestamp - currentTime);
   const totalDurationMs = Math.max(1, order.deadlineMinutes * 60 * 1000);
   const countdownPercent = Math.min(100, Math.max(0, (remainingMs / totalDurationMs) * 100));
@@ -78,22 +100,18 @@ export const OrderReceiptModal = ({
       timestamp: new Date(order.createdAt).toISOString(),
       network: 'Stellar Testnet',
       ledgerSequence: latestLedger,
-      escrowContract: order.escrowContractId,
-      principalCommittedUsdc: order.amount,
-      matchedAmountUsdc: order.matchedAmount,
-      remainingAmountUsdc: order.remainingAmount,
+      settlementContract: order.escrowContractId,
+      totalUsd: order.amount,
+      matchedLocallyUsd: order.matchedAmount,
+      unmatchedUsd: unmatchedAmount,
+      unmatchedOutcome: unmatched.label,
       route: `${order.fromCountry} -> ${order.toCountry}`,
+      routedVia: order.routeVia || null,
       sender: { name: order.senderName, address: order.senderAddress },
       recipient: { name: order.recipientName, address: order.recipientAddress },
-      remainderPolicy: order.remainderPolicy,
       status: order.status,
-      depositTxHash: order.depositTxHash,
-      settlementTxHash: order.settlementTxHash || null,
-      fallbackTxHash: order.fallbackTxHash || null,
+      stellarPayoutTxHash: order.fallbackTxHash || null,
       matchHistory: order.matchHistory,
-      feeSavingsUsdc: 45.0,
-      protocolFeeUsdc: 0.0,
-      stellarBaseFeeXlm: 0.00001,
     };
 
     const blob = new Blob([JSON.stringify(auditData, null, 2)], {
@@ -201,9 +219,9 @@ export const OrderReceiptModal = ({
             </div>
 
             <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-              <span className="text-[11px] text-slate-500 block mb-0.5">Principal Amount</span>
-              <div className="text-base font-bold font-mono-numbers text-slate-900 dark:text-white">${order.amount.toFixed(2)} USDC</div>
-              <span className="text-[10px] text-slate-400 font-mono-numbers">Pre-authorized · nothing charged until settled</span>
+              <span className="text-[11px] text-slate-500 block mb-0.5">Transfer Amount</span>
+              <div className="text-base font-bold font-mono-numbers text-slate-900 dark:text-white">{usd(order.amount)}</div>
+              <span className="text-[10px] text-slate-400">{principalNote}</span>
             </div>
 
             <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
@@ -217,6 +235,9 @@ export const OrderReceiptModal = ({
                   {order.toFlag} {order.toCountry}
                 </span>
               </div>
+              {order.routeVia && (
+                <span className="text-[10px] text-violet-600 dark:text-violet-400 block">Routed via {order.routeVia}</span>
+              )}
               <span className="text-[10px] text-slate-400">Created: {createdDate}</span>
             </div>
           </div>
@@ -259,29 +280,32 @@ export const OrderReceiptModal = ({
               <span className="font-semibold text-slate-900 dark:text-white text-[11px] uppercase tracking-wider">
                 Netting Audit & Settlement Ledger
               </span>
-              <span className="text-[11px] font-mono text-slate-500">{percent.toFixed(0)}% Netted</span>
+              <span className="text-[11px] font-mono text-slate-500">{percent.toFixed(0)}% matched locally</span>
             </div>
 
             <div className="p-4 space-y-3 font-mono-numbers">
               <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
-                <span className="text-slate-600 dark:text-slate-400">Total amount (USD):</span>
-                <span className="font-semibold text-slate-900 dark:text-white">${order.amount.toFixed(2)} USDC</span>
+                <span className="text-slate-600 dark:text-slate-400">Total amount:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{usd(order.amount)}</span>
               </div>
 
               <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Bilateral Matched (P2P Offset):
+                  Matched locally (no blockchain):
                 </span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">${order.matchedAmount.toFixed(2)} USDC</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">{usd(order.matchedAmount)}</span>
               </div>
 
               <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-xs">
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  Unmatched Remainder:
+                  {unmatched.label}:
                 </span>
-                <span className="font-semibold text-slate-900 dark:text-white">${order.remainingAmount.toFixed(2)} USDC</span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {usd(unmatchedAmount)}
+                  {unmatched.usdc ? ' USDC' : ''}
+                </span>
               </div>
 
               {/* How the sender pays in the matched amount */}
@@ -297,8 +321,8 @@ export const OrderReceiptModal = ({
                     {Object.values(order.fundingMethod.details).join(' · ')}
                   </span>
                   <span className="block text-[10px] text-slate-400 mt-0.5">
-                    Recipient collects through the partner network however they prefer. Unmatched amount → USDC to their Stellar wallet as
-                    USDC via Stellar Blockchain.
+                    Recipient collects through the partner network however they prefer. Any unmatched amount is sent as USDC via Stellar
+                    Blockchain.
                   </span>
                 </div>
               )}
@@ -330,7 +354,7 @@ export const OrderReceiptModal = ({
                             </span>
                           )}
                         </div>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">+${rec.amount.toFixed(2)} USDC</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">+{usd(rec.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -338,7 +362,11 @@ export const OrderReceiptModal = ({
               ) : (
                 <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-800/30 text-slate-500 text-[11px] font-sans flex items-center gap-2">
                   <AlertCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>No opposing peer has matched this order yet. If matching occurs, it will automatically offset here.</span>
+                  <span>
+                    {isPending
+                      ? 'No opposing peer has matched this order yet. If matching occurs, it will automatically offset here.'
+                      : 'Nothing was matched, so the whole amount was handled as the unmatched part above.'}
+                  </span>
                 </div>
               )}
             </div>
@@ -350,7 +378,7 @@ export const OrderReceiptModal = ({
               <div className="flex justify-between items-baseline">
                 <div>
                   <span className="font-semibold text-slate-900 dark:text-white text-xs block">
-                    The Rest of the Money (${order.remainingAmount.toFixed(2)} USDC Remaining Unmatched)
+                    The Rest of the Money ({usd(order.remainingAmount)} still unmatched)
                   </span>
                   <span className="text-[10px] text-slate-500">
                     Counterparty matching active. Choose how to resolve the remaining balance right now:
@@ -497,29 +525,6 @@ export const OrderReceiptModal = ({
             </div>
           </div>
 
-          {/* Fee & Economics Audit */}
-          <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
-            <span className="font-semibold text-slate-900 dark:text-white text-xs block">Fee & Capital Efficiency Audit</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono-numbers">
-              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Stellar Gas</span>
-                <span className="font-bold text-slate-900 dark:text-white">0.00001 XLM</span>
-              </div>
-              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Netting Fee</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">$0.00</span>
-              </div>
-              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px]">SWIFT Fee Avoided</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">~$45.00</span>
-              </div>
-              <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Settlement Time</span>
-                <span className="font-bold text-slate-900 dark:text-white">3.8s</span>
-              </div>
-            </div>
-          </div>
-
           {/* Stellar Blockchain Hashes */}
           <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-mono text-[11px] space-y-2 text-slate-600 dark:text-slate-400">
             <div className="flex justify-between items-center font-sans font-semibold text-slate-900 dark:text-white text-xs">
@@ -527,42 +532,12 @@ export const OrderReceiptModal = ({
               <span className="text-[10px] text-slate-400 font-mono">Horizon Live</span>
             </div>
 
-            {order.depositTxHash && (
-              <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500">USDC Pre-authorization Tx (no funds moved):</span>
-                <a
-                  href={`https://stellar.expert/explorer/testnet/tx/${order.depositTxHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
-                >
-                  <span>{order.depositTxHash.slice(0, 18)}...</span>
-                  <ExternalLink className="w-3 h-3 text-slate-400" />
-                </a>
-              </div>
-            )}
-
             {order.matchHistory.length > 0 && (
               <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500">Matched volume (netted off-chain):</span>
+                <span className="text-slate-500">Matched part (settled locally, not on-chain):</span>
                 <span className="text-slate-900 dark:text-white font-mono font-medium">
                   {order.matchHistory.map((m) => m.txHash).join(', ')}
                 </span>
-              </div>
-            )}
-
-            {order.settlementTxHash && (
-              <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500">Bilateral Netting Settlement Tx:</span>
-                <a
-                  href={`https://stellar.expert/explorer/testnet/tx/${order.settlementTxHash.replace('0x', '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-slate-900 dark:text-white hover:underline flex items-center gap-1 font-mono font-medium"
-                >
-                  <span>{order.settlementTxHash.slice(0, 18)}...</span>
-                  <ExternalLink className="w-3 h-3 text-slate-400" />
-                </a>
               </div>
             )}
 

@@ -107,7 +107,10 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
 
       {pts != null && (
         <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-200">
-          Domestic is about <strong className="font-mono-numbers">{pts} percentage points {overseasPct >= domPct ? 'less' : 'more'}</strong>{' '}
+          Domestic is about{' '}
+          <strong className="font-mono-numbers">
+            {pts} percentage points {overseasPct >= domPct ? 'less expensive' : 'more expensive'}
+          </strong>{' '}
           than overseas.
         </div>
       )}
@@ -174,7 +177,9 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
                   )}
                 </ul>
               ) : overseas?.averagePct != null ? (
-                <div>World Bank average, ~{overseas.averagePct}% all-in (no live quotes for {from.currency} → {to.currency}).</div>
+                <div>
+                  World Bank average, ~{overseas.averagePct}% all-in (no live quotes for {from.currency} → {to.currency}).
+                </div>
               ) : (
                 <div>No price data available.</div>
               )}
@@ -184,12 +189,14 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
               <div>
                 <div className={sectionTitle}>Comparison</div>
                 <div>
-                  Domestic is {pts} percentage points {overseasPct >= domPct ? 'less' : 'more'} than the cheapest overseas option
+                  Domestic is {pts} percentage points {overseasPct >= domPct ? 'less expensive' : 'more expensive'} than the cheapest
+                  overseas option
                   {row && bankMarkup ? (
                     <>
                       {' '}
                       ({Math.max(0, row.bankMarkup[0] - domPct).toFixed(2)}
-                      {row.bankMarkup[1] !== row.bankMarkup[0] && `–${Math.max(0, row.bankMarkup[1] - domPct).toFixed(2)}`} less than a bank)
+                      {row.bankMarkup[1] !== row.bankMarkup[0] && `–${Math.max(0, row.bankMarkup[1] - domPct).toFixed(2)}`} less than a
+                      bank)
                     </>
                   ) : (
                     typical && typical !== cheapest && <> ({Math.max(0, typical.totalPct - domPct).toFixed(2)} less than typical)</>
