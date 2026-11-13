@@ -25,9 +25,10 @@ from .shared_data import find_provider, fx_for, validate_selection
 ACTIVE = "('open','partially_matched')"
 # Order types that wait in the book: user orders and routed legs created by chain routing.
 MATCHABLE = "('matched_pool','routed')"
-# A chain is only formed if both timers have at least this long left. (So windows under a minute
-# still match directly but are never chain-routed.)
-MIN_ROUTE_WINDOW_MS = 60_000
+# A chain is formed only while both timers are still open (this is just a margin for clock jitter).
+# Routing pays off even with seconds left: two cross-border payouts (A -> B, B -> C) become one
+# (A -> C) and B is paid locally, so short windows (e.g. 15 s) route too. Expired orders never route.
+MIN_ROUTE_WINDOW_MS = 1_000
 # Shortest matching window: 15 seconds.
 MIN_WINDOW_MINUTES = 0.25
 POLICIES = ("direct_stellar_fallback", "refund_to_sender", "convert_to_fiat_bank")

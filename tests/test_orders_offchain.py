@@ -157,10 +157,21 @@ def test_unmatched_routed_leg_settles_on_chain_at_its_own_expiry(three):
     assert svc.expired_ids() == [route["id"]]  # the worker would now settle it via settle_remainder
 
 
-def test_no_chain_when_a_timer_is_nearly_out(three):
+def test_chains_even_when_a_timer_is_nearly_out_keeping_the_earlier_deadline(three):
     db, _, svc, ca, ke, ng = three
     x, _ = svc.place_for_account(ca, draft("Canada", "Kenya", ke["wallet_public"], "5"))
-    db.execute("UPDATE orders SET deadline_at = ? WHERE id = ?", (now_ms() + 20_000, x["id"]))
+    soon = now_ms() + 20_000
+    db.execute("UPDATE orders SET deadline_at = ? WHERE id = ?", (soon, x["id"]))
+    _, batches = svc.place_for_account(ke, draft("Kenya", "Nigeria", ng["wallet_public"], "5"))
+    assert [b["method"] for b in batches] == ["chain_routing"]
+    routed = db.execute("SELECT * FROM orders WHERE transfer_type = 'routed'").fetchone()
+    assert routed["deadline_at"] == soon
+
+
+def test_no_chain_once_a_timer_has_run_out(three):
+    db, _, svc, ca, ke, ng = three
+    x, _ = svc.place_for_account(ca, draft("Canada", "Kenya", ke["wallet_public"], "5"))
+    db.execute("UPDATE orders SET deadline_at = ? WHERE id = ?", (now_ms() - 1, x["id"]))
     _, batches = svc.place_for_account(ke, draft("Kenya", "Nigeria", ng["wallet_public"], "5"))
     assert batches == []
     assert db.execute("SELECT COUNT(*) FROM orders WHERE transfer_type = 'routed'").fetchone()[0] == 0

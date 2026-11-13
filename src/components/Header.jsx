@@ -17,6 +17,7 @@ export const Header = ({
     { id: 'mine', label: 'My Transactions' },
     { id: 'corridors', label: 'Transaction History' },
     { id: 'calculator', label: 'Calculator' },
+    { id: 'random', label: 'Random Test' },
     { id: 'docs', label: 'Documentation' },
   ];
 

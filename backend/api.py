@@ -393,6 +393,69 @@ def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> AP
         acct = await accounts.demo_account(country)
         return {"name": acct["display_name"], "address": acct["wallet_public"]}
 
+    # ---- Random Test tab: orders between sandbox demo accounts, shown in full (they belong to no user)
+
+    @r.post("/demo/test-order")
+    async def demo_test_order(req: Request):
+        """Place one order from the demo account in fromCountry to the demo account in toCountry."""
+        b = await _body(req)
+        frm, to = str(b.get("fromCountry") or ""), str(b.get("toCountry") or "")
+        if frm not in REGION_OF or to not in REGION_OF or frm == to:
+            raise HttpError(400, "Choose two different known countries.")
+        seconds = _float(b.get("deadlineSeconds"))
+        if not math.isfinite(seconds):
+            raise HttpError(400, "deadlineSeconds is required.")
+        sender = await accounts.demo_account(frm)
+        recipient = await accounts.demo_account(to)
+        order, matches = svc.place_for_account(sender, {
+            "senderName": sender["display_name"],
+            "recipientName": recipient["display_name"],
+            "recipientAddress": recipient["wallet_public"],
+            "fromCountry": frm,
+            "toCountry": to,
+            "fromFlag": b.get("fromFlag"),
+            "toFlag": b.get("toFlag"),
+            "amount": str(b.get("amount") or ""),
+            "deadlineMinutes": seconds / 60,
+            "remainderPolicy": "direct_stellar_fallback",
+            "notes": "Random test order.",
+        })
+        return {
+            "order": serialize(order, svc.fills_for(order["id"]), order["sender_address"]),
+            "batches": [serialize_batch(m) for m in matches],
+        }
+
+    @r.get("/demo/test-orders")
+    async def demo_test_orders(req: Request):
+        """Full details for the given demo-account orders plus any routed legs created from them."""
+        ids = [i for i in (req.query_params.get("ids") or "").split(",") if i]
+        rows = []
+        for pid in ids[:20]:
+            try:
+                o = svc.get_by_public_id(pid)
+            except HttpError:
+                continue
+            owner = accounts.get(o["account_id"]) if o["account_id"] else None
+            if owner and owner["is_demo"]:
+                rows.append(o)
+        internal = [o["id"] for o in rows]
+        if internal:
+            marks = ",".join("?" * len(internal))
+            rows += svc.db.execute(
+                f"""SELECT * FROM orders WHERE transfer_type = 'routed'
+                      AND account_id IN (SELECT id FROM accounts WHERE is_demo = 1)
+                      AND (route_in_order_id IN ({marks}) OR route_out_order_id IN ({marks})) ORDER BY id""",
+                internal + internal,
+            ).fetchall()
+        return [
+            {**serialize(o, svc.fills_for(o["id"]), o["sender_address"]), "routeInOrderId": _public_id(o["route_in_order_id"]),
+             "routeOutOrderId": _public_id(o["route_out_order_id"])}
+            for o in rows
+        ]
+
+    def _public_id(internal_id):
+        return svc.get(internal_id)["public_id"] if internal_id else None
+
     @r.post("/demo/reset")
     async def reset(req: Request):
         b = await _body(req)

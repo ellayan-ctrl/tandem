@@ -10,7 +10,7 @@ def o(i, frm, to, usdc, deadline=NOW + HOUR, routable=True, sender="", recipient
     return BookOrder(i, frm, to, to_units(usdc), 1000 + i, deadline, routable, sender, recipient)
 
 
-def chains(book, min_window=60_000):
+def chains(book, min_window=1_000):
     return match_chains(book, NOW, min_window)
 
 
@@ -36,11 +36,12 @@ def test_fifo_and_partial_fills_across_several_orders():
 
 
 def test_timers_must_allow_it():
-    # One timer is about to run out: no route (the leg would have no time to match).
-    soon = NOW + 30_000
-    assert chains([o(1, "Canada", "Kenya", "5", deadline=soon), o(2, "Kenya", "Nigeria", "5")]).fills == []
-    assert chains([o(1, "Canada", "Kenya", "5"), o(2, "Kenya", "Nigeria", "5", deadline=soon)]).fills == []
-    # Expired orders never chain either.
+    # Seconds left still route: one cross-border payout instead of two.
+    soon = NOW + 10_000
+    assert len(chains([o(1, "Canada", "Kenya", "5", deadline=soon), o(2, "Kenya", "Nigeria", "5")]).fills) == 1
+    assert len(chains([o(1, "Canada", "Kenya", "5"), o(2, "Kenya", "Nigeria", "5", deadline=soon)]).fills) == 1
+    # Within the jitter margin, or expired: never.
+    assert chains([o(1, "Canada", "Kenya", "5", deadline=NOW + 500), o(2, "Kenya", "Nigeria", "5")]).fills == []
     assert chains([o(1, "Canada", "Kenya", "5", deadline=NOW - 1), o(2, "Kenya", "Nigeria", "5")]).fills == []
 
 

@@ -10,6 +10,7 @@ import { BankAccountModal } from './components/BankAccountModal';
 import { GuidedTourModal } from './components/GuidedTourModal';
 import { MyTransactions } from './components/MyTransactions';
 import { AutoDemo } from './components/AutoDemo';
+import { RandomTest } from './components/RandomTest';
 import { CORRIDORS } from './data/mockData';
 
 import { fetchLiveNetworkStatus } from './services/stellarTestnet';
@@ -393,6 +394,11 @@ export default function App() {
         )}
 
         {activeTab === 'calculator' && <NettingCalculator corridors={CORRIDORS} />}
+
+        {/* Kept mounted so a running test survives switching tabs. */}
+        <div hidden={activeTab !== 'random'}>
+          <RandomTest corridors={CORRIDORS} />
+        </div>
 
         {activeTab === 'docs' && <ProtocolDocs />}
       </main>

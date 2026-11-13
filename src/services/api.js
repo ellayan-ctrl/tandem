@@ -74,5 +74,9 @@ export const api = {
 
   demoRecipient: (country) => call('/demo/recipient', { body: { country } }),
 
+  // Random Test tab: orders between sandbox accounts, and their full details (plus routed legs).
+  demoTestOrder: (body) => call('/demo/test-order', { body }),
+  demoTestOrders: (ids) => call(`/demo/test-orders?ids=${encodeURIComponent(ids.join(','))}`),
+
   resetDemo: (seedCanonical) => call('/demo/reset', { body: { seedCanonical } }),
 };
