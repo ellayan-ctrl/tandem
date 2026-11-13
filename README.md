@@ -148,3 +148,6 @@ Tandem works best at scale, because more transfers in both directions means more
 - B2B transfers across borders, to lower the cost and time delay of bulk payments.
 
 
+
+
+
