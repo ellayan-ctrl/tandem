@@ -1,12 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# TwoWay Stellar
 
-# Run and deploy your AI Studio app
+Cross-border transfers that match opposite-direction payments, so most of the money never crosses a border. Only the **unmatched remainder** is converted to USDC and settled on Stellar, by a Soroban contract, when the sender's matching window closes.
 
-This contains everything you need to run your app locally.
+## Live on Stellar Testnet
 
-View your app in AI Studio: https://ai.studio/apps/a9baeec7-c111-440a-a599-d24188f373d6
+| | |
+|---|---|
+| **Settlement contract ID** | `CBWQSYQH2DZDJ4IXWBWNN35KWJR6BKADT6YBCJJ2XJHXY7E3325WRQKE` |
+| **Explorer** | [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CBWQSYQH2DZDJ4IXWBWNN35KWJR6BKADT6YBCJJ2XJHXY7E3325WRQKE) |
+| **Network** | Stellar Testnet |
+| **Token** | Circle testnet USDC (`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`) |
+
+Check it from the terminal (read-only, sends nothing):
+
+```bash
+stellar contract invoke --id CBWQSYQH2DZDJ4IXWBWNN35KWJR6BKADT6YBCJJ2XJHXY7E3325WRQKE \
+  --source-account <any-key> --network testnet -- stats
+```
+
+`stats` returns the number of settlements, total order volume, the part matched off-chain, and the part settled on-chain. To run the whole flow yourself, see [Test it on Testnet](#test-it-on-testnet) below.
 
 ## How settlement works
 
@@ -42,6 +54,18 @@ Contract: [`soroban/contracts/twoway_settlement`](soroban/contracts/twoway_settl
 5. Click **Link Bank Account**, then send.
 
 Production: `npm run build && npm start` serves the API and the built front end from Python on :3000.
+
+## Test it on Testnet
+
+With the app running (`npm run dev`), run `npm run test:testnet`. It links a new sender and recipient on testnet, places a 10 USD Canada → Kenya order, matches 3 against an anonymous Kenya → Canada order, chain-routes 4 through an anonymous Kenya → Nigeria order, checks nothing is on-chain yet, closes the timers, and verifies on Horizon that only the unmatched 3 (to Kenya) and the routed 4 (to Nigeria) moved as USDC. It prints Stellar Expert links for every wallet and transaction.
+
+Read the contract directly with the Stellar CLI:
+
+```bash
+C=$(grep '^SETTLEMENT_CONTRACT_ID=' .env.local | cut -d= -f2)
+stellar contract invoke --id $C --source-account twoway-operator --network testnet -- stats
+stellar contract invoke --id $C --source-account twoway-operator --network testnet -- settlement --order_id <onchain id>
+```
 
 Tests: `npm test` (Python: matching, amounts, payment-method validation, wallet encryption, order placement + netting) and `npm run test:contract` (Soroban contract).
 
