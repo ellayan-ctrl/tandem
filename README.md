@@ -1,7 +1,7 @@
-[Tandem README (1).md](https://github.com/user-attachments/files/34779035/Tandem.README.1.md)
 # Tandem
 
 **Send together, save together.**
+Tandem matches cross-border transfers in opposing directions so remittances stop paying to cross a border it never needed to cross. Built on Stellar.
 
 Tandem is a peer-to-peer remittance app that lowers fees and makes cross-border transfers more accessible by matching opposite transfers (like CAD to KES and KES to CAD), paying each out domestically, and sending only the unmatched remainder across the border as USDC on Stellar.
 
