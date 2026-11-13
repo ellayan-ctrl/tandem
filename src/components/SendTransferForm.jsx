@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 
+import { domesticFee, overseasFee } from '../data/feeSheet';
+import { sheetRow } from '../data/sheets';
+import { api } from '../services/api';
 import { FX_RATES } from '../services/bankingService';
 import { isValidStellarPublicKey } from '../services/stellarTestnet';
 import { MethodSelect } from './MethodSelect';
@@ -35,12 +38,6 @@ const formatWindow = (minutes) => {
   const s = total % 60;
   const parts = [d && `${d} day${d > 1 ? 's' : ''}`, h && `${h} h`, m && `${m} min`, s && `${s} s`].filter(Boolean);
   return parts.join(' ') || '0 min';
-};
-
-/** Testnet accounts with USDC trustlines, so the Soroban remainder payout can land (demo convenience). */
-const DEMO_RECIPIENT_BY_COUNTRY = {
-  Kenya: 'GC7MO3K6MUMXK3W3XWAN2XJYWO5RNPSTJXNTV5SZQAUENT7GWIFBZEUI',
-  Canada: 'GANIMAPEKBIP3YXIY7SZIRQ7XARNHDGTPCN5UTIBTXX64LCSFQ6DA4JO',
 };
 
 export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreated, onNavigateToDashboard }) => {
@@ -111,7 +108,29 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
     minute: '2-digit',
   });
 
-  const estimatedSavings = (parsedAmount * (activeCorridor.offRampSavingsPct / 100)).toFixed(2);
+  // If the whole amount matched: the spreadsheet's overseas-provider fee minus its domestic-rail fee
+  // for this direction (both in the sender's currency, converted to USD).
+  const feeRow = sheetRow(fromCountry.name, toCountry.name);
+  const senderFx = FX_RATES[fromCountry.currency]?.rate;
+  const matchSavings =
+    feeRow && senderFx && parsedAmount > 0
+      ? Math.max(0, overseasFee(feeRow, parsedAmount * senderFx) - domesticFee(feeRow, parsedAmount * senderFx).high) / senderFx
+      : null;
+
+  // "Use testnet demo address": the sandbox account in the destination country (it holds a USDC trustline).
+  const [demoAddressLoading, setDemoAddressLoading] = useState(false);
+  const fillDemoAddress = async () => {
+    setDemoAddressLoading(true);
+    try {
+      const r = await api.demoRecipient(toCountry.name);
+      setRecipientAddress(r.address);
+      if (!recipientName.trim()) setRecipientName(r.name);
+    } catch (e) {
+      setFormError(`Could not get a demo address: ${e.message}`);
+    } finally {
+      setDemoAddressLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -358,21 +377,6 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
                 }
               />
             </div>
-
-            {/* Quick preset buttons */}
-            <div className="flex items-center gap-1.5 mt-2">
-              <span className="text-[11px] text-slate-400 mr-1">Preset:</span>
-              {[100, 250, 500, 1000].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setAmount(val.toString())}
-                  className="px-2 py-0.5 text-xs rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-mono-numbers transition-colors"
-                >
-                  ${val}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -382,11 +386,12 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
             <span className="font-semibold text-slate-900 dark:text-white">Recipient in {toCountry.name}</span>
             <button
               type="button"
-              onClick={() => setRecipientAddress(DEMO_RECIPIENT_BY_COUNTRY[toCountry.name] ?? DEMO_RECIPIENT_BY_COUNTRY.Kenya)}
-              className="text-[11px] text-slate-500 hover:underline"
-              title="Fill a testnet address that holds a USDC trustline"
+              onClick={fillDemoAddress}
+              disabled={demoAddressLoading}
+              className="text-[11px] text-slate-500 hover:underline disabled:opacity-60"
+              title={`Fill the sandbox account in ${toCountry.name} (it holds a USDC trustline)`}
             >
-              Use testnet demo address
+              {demoAddressLoading ? 'Preparing address…' : 'Use testnet demo address'}
             </button>
           </div>
 
@@ -548,8 +553,11 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
           </div>
           {transferMode === 'matched_pool' && (
             <div className="flex justify-between text-slate-800 dark:text-slate-200 font-sans font-medium">
-              <span>Estimated anchor savings:</span>
-              <span className="font-mono-numbers">~${estimatedSavings} USDC</span>
+              <span>
+                If fully matched, saves vs {feeRow?.provider ?? 'an overseas provider'}
+                {feeRow ? ` (fee spreadsheet, ${feeRow.id})` : ''}:
+              </span>
+              <span className="font-mono-numbers">{matchSavings === null ? 'not in the spreadsheet' : `~$${matchSavings.toFixed(2)}`}</span>
             </div>
           )}
         </div>

@@ -13,6 +13,7 @@
     "clean": "rm -rf dist",
     "test": ".venv/bin/python -m pytest -q",
     "test:contract": "cd soroban && cargo test",
+    "test:js": "node --test src/data/feeSheet.test.js",
     "deploy:contract": "scripts/deploy-contract.sh",
     "setup:treasury": ".venv/bin/python scripts/setup_treasury.py",
     "test:testnet": ".venv/bin/python scripts/verify_testnet.py"

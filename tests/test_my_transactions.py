@@ -64,9 +64,9 @@ def test_ramps_rank_in_country_then_region_then_global():
 def test_ramps_fall_back_to_the_snapshot_when_scout_is_unreachable(monkeypatch):
     monkeypatch.setattr(ramps, "SCOUT_URL", "http://127.0.0.1:9/unreachable")
     monkeypatch.setitem(ramps._cache, "partners", None)
-    res = asyncio.run(ramps.ramps_for("Argentina"))
+    res = asyncio.run(ramps.ramps_for("Kenya"))
     assert res["source"] == "snapshot"
-    assert any(s["name"] == "Anclap" and s["scope"] == "in-country" for s in res["services"])
+    assert any(s["name"] == "Honey Coin" and s["scope"] == "in-country" for s in res["services"])
 
 
 def test_unknown_country_returns_no_services(monkeypatch):

@@ -1,5 +1,7 @@
 import { Activity, BookOpen, Landmark, Play } from 'lucide-react';
 
+import logoUrl from '../assets/tandem-logo.png';
+
 export const Header = ({
   activeTab,
   setActiveTab,
@@ -18,7 +20,6 @@ export const Header = ({
     { id: 'corridors', label: 'Transaction History' },
     { id: 'calculator', label: 'Calculator' },
     { id: 'random', label: 'Random Test' },
-    { id: 'docs', label: 'Documentation' },
   ];
 
   return (
@@ -27,9 +28,9 @@ export const Header = ({
         <div className="flex items-center justify-between gap-6 h-15">
           {/* Zone 1: Wordmark */}
           <div className="flex items-center gap-3 shrink-0">
-            <button onClick={() => setActiveTab('send')} className="text-left group flex items-baseline gap-2">
-              <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white">TwoWay</span>
-              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">Stellar Clearing</span>
+            <button onClick={() => setActiveTab('send')} className="text-left group flex items-center gap-2" aria-label="Tandem, go to Send">
+              <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white">Tandem</span>
+              <img src={logoUrl} alt="Tandem logo" className="h-4 w-auto" />
             </button>
           </div>
 

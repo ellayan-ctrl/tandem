@@ -3,7 +3,6 @@ import { Header } from './components/Header';
 import { SendTransferForm } from './components/SendTransferForm';
 import { TransactionDashboard } from './components/TransactionDashboard';
 import { CorridorVisualizer } from './components/CorridorVisualizer';
-import { ProtocolDocs } from './components/ProtocolDocs';
 import { NettingCalculator } from './components/NettingCalculator';
 import { OrderReceiptModal } from './components/OrderReceiptModal';
 import { BankAccountModal } from './components/BankAccountModal';
@@ -11,7 +10,7 @@ import { GuidedTourModal } from './components/GuidedTourModal';
 import { MyTransactions } from './components/MyTransactions';
 import { AutoDemo } from './components/AutoDemo';
 import { RandomTest } from './components/RandomTest';
-import { CORRIDORS } from './data/mockData';
+import { CORRIDORS, FLAGS, partnersOf } from './data/corridors';
 
 import { fetchLiveNetworkStatus } from './services/stellarTestnet';
 import { api, getAccountToken, setAccountToken } from './services/api';
@@ -220,8 +219,8 @@ export default function App() {
           o.transferType !== 'direct_instant' &&
           (o.status === 'open' || o.status === 'partially_matched'),
       );
-      const fromCountry = mine?.toCountry ?? 'Kenya';
-      const toCountry = mine?.fromCountry ?? 'Canada';
+      const fromCountry = mine?.toCountry ?? CORRIDORS[0].countryB.name;
+      const toCountry = mine?.fromCountry ?? CORRIDORS[0].countryA.name;
       const amount = mine ? Math.max(0.01, Math.round(mine.remainingAmount * 60) / 100) : 2;
       showToast('Placing an anonymous counterparty order (first time sets up demo accounts, ~10s)...');
       const { batches } = await api.counterpartyOrder({
@@ -245,9 +244,10 @@ export default function App() {
       );
     });
 
-  // Demo: an anonymous order ONWARD from your destination to a third country (e.g. you send Canada -> Kenya,
-  // someone sends Kenya -> Nigeria). Chain routing pays your recipient locally in Kenya and turns your money
-  // into one routed Canada -> Nigeria transfer, matched locally if possible, otherwise sent via Stellar at expiry.
+  // Demo: an anonymous order ONWARD from your destination to a third country (e.g. you send Canada -> United States,
+  // someone sends United States -> European Union). Chain routing pays your recipient locally in the US and turns
+  // your money into one routed Canada -> European Union transfer, matched locally if possible, otherwise sent via
+  // Stellar at expiry. The third country is one of the app's pairs with your destination.
   const handleSimulateOnwardOrder = () =>
     withToast(async () => {
       const mine = orders.find(
@@ -258,19 +258,15 @@ export default function App() {
           (o.status === 'open' || o.status === 'partially_matched'),
       );
       if (!mine) throw new Error('Place a Transfer Matching order first, then simulate an onward order from its destination.');
-      const flagOf = {};
-      CORRIDORS.forEach((c) => {
-        flagOf[c.countryA.name] = c.countryA.flag;
-        flagOf[c.countryB.name] = c.countryB.flag;
-      });
-      const third = ['Nigeria', 'Philippines', 'Kenya', 'Canada', 'Argentina'].find((c) => c !== mine.fromCountry && c !== mine.toCountry);
+      const third = partnersOf(mine.toCountry).find((c) => c !== mine.fromCountry);
+      if (!third) throw new Error(`${mine.toCountry} has no other country pair to route onward to.`);
       const amount = Math.max(0.01, Math.round(mine.remainingAmount * 60) / 100);
       showToast(`Placing an anonymous ${mine.toCountry} → ${third} order (first time sets up demo accounts, ~10s)...`);
       const { batches } = await api.counterpartyOrder({
         fromCountry: mine.toCountry,
         toCountry: third,
         fromFlag: mine.toFlag,
-        toFlag: flagOf[third],
+        toFlag: FLAGS[third],
         amount: amount.toFixed(2),
       });
       const fresh = await api.orders();
@@ -400,7 +396,6 @@ export default function App() {
           <RandomTest corridors={CORRIDORS} />
         </div>
 
-        {activeTab === 'docs' && <ProtocolDocs />}
       </main>
 
       {/* Settlement Audit Report & Receipt Modal */}
@@ -436,36 +431,13 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-6 mt-12 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-800 dark:text-slate-200">TwoWay</span>
-            <span>·</span>
-            <span>Stellar Testnet</span>
-            <span>·</span>
-            <span className="font-mono-numbers">Ledger #{latestLedger}</span>
-            <span>·</span>
-            <button onClick={() => setTourOpen(true)} className="hover:underline text-slate-600 dark:text-slate-400">
-              Interactive Tour
-            </button>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button onClick={() => openAccountModal()} className="hover:text-slate-900 dark:hover:text-white transition-colors">
-              Bank Account
-            </button>
-            <button onClick={() => setActiveTab('dashboard')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
-              Live Orders
-            </button>
-            <button onClick={() => setActiveTab('mine')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
-              My Transactions
-            </button>
-            <button onClick={() => setActiveTab('corridors')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
-              Transaction History
-            </button>
-            <button onClick={() => setActiveTab('docs')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
-              Documentation
-            </button>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-800 dark:text-slate-200">Tandem</span>
+          <span>© {new Date().getFullYear()} Tandem. All rights reserved.</span>
+          <span>·</span>
+          <button onClick={() => setTourOpen(true)} className="hover:underline text-slate-600 dark:text-slate-400">
+            Interactive Tour
+          </button>
         </div>
       </footer>
     </div>

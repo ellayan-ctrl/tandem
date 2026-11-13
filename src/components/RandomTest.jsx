@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { Check, ExternalLink, Loader2, Shuffle, X } from 'lucide-react';
 
+import { COUNTRIES, isPair, partnersOf } from '../data/corridors';
 import { api } from '../services/api';
 
-const COUNTRIES = ['Canada', 'Kenya', 'Nigeria', 'Philippines', 'United States', 'European Union', 'Argentina'];
 const WINDOW_SECONDS = 20;
 const GIVE_UP_MS = 150_000; // after the last deadline (failed payouts are retried every 30 s)
 const HORIZON = 'https://horizon-testnet.stellar.org';
@@ -23,22 +23,37 @@ const shuffle = (arr) => {
   return a;
 };
 
-/** Random orders for a mode, using only countries that have no waiting orders (so nothing else interferes). */
+/**
+ * Random orders for a mode, using only the app's country pairs (shared/corridors.json) and only countries
+ * that have no waiting orders (so nothing else interferes). Returns null if no such pair/chain exists.
+ */
 const rollOrders = (mode, quiet) => {
-  const [a, b, c] = shuffle(quiet);
+  const ok = new Set(quiet);
   const amt = () => randInt(100, 2000); // $1.00 .. $20.00
   let orders;
   if (mode === 'direct') {
+    const pairs = quiet.flatMap((a) => partnersOf(a).filter((b) => ok.has(b)).map((b) => [a, b]));
+    if (!pairs.length) return null;
+    const [a, b] = shuffle(pairs)[0];
     orders = [
       { from: a, to: b, cents: amt() },
       { from: b, to: a, cents: amt() },
     ];
   } else {
+    // A -> B -> C where A-B and B-C are pairs.
+    const chains = quiet.flatMap((a) =>
+      partnersOf(a)
+        .filter((b) => ok.has(b))
+        .flatMap((b) => partnersOf(b).filter((c) => c !== a && ok.has(c)).map((c) => [a, b, c])),
+    );
+    if (!chains.length) return null;
+    const [a, b, c] = shuffle(chains)[0];
     orders = [
       { from: a, to: b, cents: amt() },
       { from: b, to: c, cents: amt() },
     ];
-    if (Math.random() < 0.5) orders.push({ from: c, to: a, cents: amt() }); // sometimes close the loop
+    // Sometimes close the loop, when C-A is also a pair.
+    if (isPair(c, a) && Math.random() < 0.5) orders.push({ from: c, to: a, cents: amt() });
   }
   return shuffle(orders); // random arrival order
 };
@@ -114,13 +129,13 @@ export const RandomTest = ({ corridors }) => {
         book.filter((o) => (o.status === 'open' || o.status === 'partially_matched') && o.remainingAmount > 0).flatMap((o) => [o.fromCountry, o.toCountry]),
       );
       const quiet = COUNTRIES.filter((c) => !busy.has(c));
-      const need = mode === 'direct' ? 2 : 3;
-      if (quiet.length < need) {
-        throw new Error(`Only ${quiet.length} countries have no waiting orders; this test needs ${need}. Wait for open orders to finish, then try again.`);
-      }
-
       // 2. Roll the dice and work out what should happen.
       const orders = rollOrders(mode, quiet);
+      if (!orders) {
+        throw new Error(
+          `No ${mode === 'direct' ? 'country pair' : 'chain of two country pairs'} is free right now (countries with waiting orders: ${[...busy].join(', ') || 'none'}). Wait for those orders to finish, then try again.`,
+        );
+      }
       const expect = expectationsFor(orders);
       setRun({ mode, orders, expect });
       stop();

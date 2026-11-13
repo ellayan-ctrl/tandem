@@ -86,7 +86,7 @@ def _serialize_full(o: sqlite3.Row, fills: list) -> dict:
         "deadlineTimestamp": o["deadline_at"],
         "remainderPolicy": o["remainder_policy"],
         "transferType": o["transfer_type"],
-        # Routed legs (chain routing): the country the route skipped, e.g. Canada -> Nigeria via Kenya.
+        # Routed legs (chain routing): the country the route skipped, e.g. Canada -> European Union via United States.
         "routeVia": o["route_via"],
         "matchHistory": history,
         "escrowContractId": config.settlement_contract_id,

@@ -12,17 +12,25 @@ and routing may not create or lose money).
 What goes on-chain is read from the database after matching: every order's (or routed leg's)
 remaining amount is what its timer will send from its from-country to its to-country.
 """
+import json
 import random
 
 import pytest
 
 from backend.accounts import AccountService
+from backend.config import ROOT
 from backend.db import open_db
 from backend.orders import OrderService
 from backend.shared_data import providers_for
 from tests.test_orders_offchain import draft, make_account
 
-COUNTRIES = ["Canada", "Kenya", "Nigeria", "Philippines", "United States", "European Union", "Argentina"]
+# The app's country pairs (shared/corridors.json), the same list the Random Test tab uses.
+_CORRIDORS = json.loads((ROOT / "shared" / "corridors.json").read_text())
+PAIRS = [(p["a"], p["b"]) for p in _CORRIDORS["pairs"]]
+COUNTRIES = list(_CORRIDORS["countries"])
+DIRECTIONS = PAIRS + [(b, a) for a, b in PAIRS]
+partners = lambda x: [b for a, b in DIRECTIONS if a == x]  # noqa: E731
+is_pair = lambda x, y: (x, y) in DIRECTIONS  # noqa: E731
 WINDOWS = [0.25, 1 / 3, 0.5, 30]  # 15 s, 20 s, 30 s, 30 min
 
 
@@ -71,13 +79,16 @@ def on_chain(db):
 
 
 def random_shape(rng, kind):
-    a, b, c = rng.sample(COUNTRIES, 3)
+    """Same shapes as the Random Test tab: a pair both ways, or a chain A -> B -> C of two pairs."""
     amt = lambda: rng.randint(100, 2000)  # $1.00 .. $20.00  # noqa: E731
     if kind == "direct":
+        a, b = rng.choice(DIRECTIONS)
         orders = [(a, b, amt()), (b, a, amt())]
     else:
+        chains = [(a, b, c) for a, b in DIRECTIONS for c in partners(b) if c != a]
+        a, b, c = rng.choice(chains)
         orders = [(a, b, amt()), (b, c, amt())]
-        if rng.random() < 0.5:
+        if is_pair(c, a) and rng.random() < 0.5:
             orders.append((c, a, amt()))  # close the loop
     rng.shuffle(orders)  # random arrival order
     return orders
@@ -102,11 +113,11 @@ def test_random_demo_shapes_send_only_the_minimum_on_chain(kind, seed):
 def test_random_books_conserve_money(seed):
     """Any mix of orders: matching and routing may never create or lose money in any country."""
     rng = random.Random(f"book-{seed}")
-    countries = rng.sample(COUNTRIES, rng.randint(2, 5))
     orders = []
     for _ in range(rng.randint(2, 9)):
-        frm, to = rng.sample(countries, 2)
+        frm, to = rng.choice(DIRECTIONS)
         orders.append((frm, to, rng.randint(100, 2000)))
+    countries = sorted({c for o in orders for c in o[:2]})
     db, svc, who = fresh_book()
     place(svc, who, orders, rng.choice(WINDOWS))
 

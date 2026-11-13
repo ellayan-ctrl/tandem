@@ -248,11 +248,11 @@ export const TransactionDashboard = ({
             USDC and sent via Stellar Blockchain, so blockchain and conversion fees apply only to that part.
           </p>
           <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-            <strong>Chain routing:</strong> transfers also connect through a third country. If you send <strong>Canada → Kenya</strong>{' '}
-            and someone sends <strong>Kenya → Nigeria</strong>, their Kenyan money pays your recipient locally, and your money becomes one
-            routed <strong>Canada → Nigeria</strong> transfer. That routed transfer matches like any other (a Nigeria → Canada sender closes
-            the loop with nothing sent cross-border); otherwise only it goes via Stellar Blockchain. Routes form only while both timers have
-            at least a minute left, and the routed transfer keeps the earlier of the two deadlines.
+            <strong>Chain routing:</strong> transfers also connect through a third country. If you send <strong>Canada → United States</strong>{' '}
+            and someone sends <strong>United States → European Union</strong>, their US money pays your recipient locally, and your money
+            becomes one routed <strong>Canada → European Union</strong> transfer. That routed transfer matches like any other (a European
+            Union → Canada sender closes the loop with nothing sent cross-border); otherwise only it goes via Stellar Blockchain. Routes form
+            while both timers are still running, and the routed transfer keeps the earlier of the two deadlines.
           </p>
         </div>
       )}

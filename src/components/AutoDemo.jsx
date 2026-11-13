@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ExternalLink, Loader2, Play, X } from 'lucide-react';
 
+import { COUNTRIES, isPair, partnersOf } from '../data/corridors';
 import { api } from '../services/api';
 
 const WINDOW_MINUTES = 0.25; // 15 seconds
@@ -96,11 +97,24 @@ export const AutoDemo = ({ open, onClose, account, corridors, ensureAccount, onR
       setStep(0, { state: 'active', note: account ? 'Using your linked account.' : 'Linking a demo Canada account (about 10 s)...' });
       const acct = account ?? (await ensureAccount());
       stop();
-      const corridor = corridors.find((c) => c.countryA.name === acct.country || c.countryB.name === acct.country);
-      if (!corridor) throw new Error(`The demo has no country pair for ${acct.country}.`);
-      const A = corridor.countryA.name === acct.country ? corridor.countryA.name : corridor.countryB.name;
-      const B = corridor.countryA.name === acct.country ? corridor.countryB.name : corridor.countryA.name;
-      const C = ['Nigeria', 'Philippines', 'Kenya', 'Canada', 'Argentina', 'United States'].find((c) => c !== A && c !== B);
+      // Countries come from the app's pairs (shared/corridors.json). The 3-country demo needs a triangle:
+      // A-B, B-C and C-A must all be pairs, so the loop can close.
+      const A = acct.country;
+      const partners = partnersOf(A);
+      if (!partners.length) throw new Error(`${A} is not in any of the app's country pairs.`);
+      let B = partners[0];
+      let C = null;
+      if (which === 'three') {
+        const tri = partners.flatMap((b) => partnersOf(b).filter((c) => c !== A && isPair(c, A)).map((c) => [b, c]))[0];
+        if (!tri) {
+          throw new Error(
+            `${A}'s country pairs don't form a triangle, so a 3-country loop isn't possible from ${A}. Link an account in one of: ${COUNTRIES.filter(
+              (x) => partnersOf(x).some((b) => partnersOf(b).some((c) => c !== x && isPair(c, x))),
+            ).join(', ')}.`,
+          );
+        }
+        [B, C] = tri;
+      }
       setStep(0, { state: 'done', note: `${acct.displayName}, ${flagOf[A]} ${A}.` });
 
       // You send 10 A -> B.

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import sqlite3
 import sys
@@ -43,17 +44,22 @@ http = httpx.Client(timeout=180)
 loop = asyncio.new_event_loop()
 failures: list = []
 
-# Country sets (A -> B -> C). A and B need a payment method this script can link; C only a demo account.
-TRIOS = [("Canada", "Kenya", "Nigeria"), ("United States", "Philippines", "Argentina")]
+# Country sets (A -> B -> C) from the app's pairs (shared/corridors.json): A-B and B-C are both pairs.
+# A and B need a payment method this script can link; C only a demo account.
+_CORRIDORS = json.loads((ROOT / "shared" / "corridors.json").read_text())
+FLAGS = {name: c["flag"] for name, c in _CORRIDORS["countries"].items()}
+TRIOS = [("Canada", "United States", "European Union"), ("European Union", "United States", "Philippines"), ("United States", "Canada", "Kenya")]
 SENDER_BANK = {
     "Canada": ("ca-rbc", {"transit": "12345", "institution": "003", "accountNumber": "7654321"}),
     "United States": ("us-chase", {"routing": "021000021", "accountNumber": "123456789"}),
+    "European Union": ("eu-sepa", {"bankName": "Demo Bank", "iban": "DE89370400440532013000"}),
 }
 RECIPIENT_BANK = {
-    "Kenya": ("ke-mpesa", {"phone": "+254712345678"}),
-    "Philippines": ("ph-bdo", {"accountNumber": "1234567890"}),
+    "United States": ("us-chase", {"routing": "021000021", "accountNumber": "987654321"}),
+    "Canada": ("ca-rbc", {"transit": "54321", "institution": "004", "accountNumber": "1234567"}),
 }
-FLAGS = {"Canada": "🇨🇦", "Kenya": "🇰🇪", "Nigeria": "🇳🇬", "United States": "🇺🇸", "Philippines": "🇵🇭", "Argentina": "🇦🇷"}
+_pairs = {(p["a"], p["b"]) for p in _CORRIDORS["pairs"]} | {(p["b"], p["a"]) for p in _CORRIDORS["pairs"]}
+assert all((a, b) in _pairs and (b, c) in _pairs for a, b, c in TRIOS), "every trio must be two of the app's pairs"
 
 
 # ------------------------------------------------------------------------------ helpers

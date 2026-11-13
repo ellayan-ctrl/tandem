@@ -23,15 +23,10 @@ SCOUT_PARAMS = {"type": "anchor", "all": "1", "limit": "100"}  # type=anchor is 
 SNAPSHOT = ROOT / "shared" / "ramp_partners_snapshot.json"
 CACHE_TTL_S = 6 * 3600
 
-# The directory's region vocabulary (north-america, latam, europe, africa, mena, asia, oceania, global).
+# The app's countries (shared/corridors.json) and their region in the directory's vocabulary
+# (north-america, latam, europe, africa, mena, asia, oceania, global).
 REGION_OF = {
-    "Canada": "north-america",
-    "United States": "north-america",
-    "Kenya": "africa",
-    "Nigeria": "africa",
-    "European Union": "europe",
-    "Argentina": "latam",
-    "Philippines": "asia",
+    name: c["region"] for name, c in json.loads((ROOT / "shared" / "corridors.json").read_text())["countries"].items()
 }
 
 # Partners with physical cash points the user can walk into; the app links a map search for these.
