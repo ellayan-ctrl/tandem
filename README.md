@@ -6,6 +6,8 @@ Tandem matches cross-border transfers in opposing directions so remittances stop
 
 A peer-to-peer remittance app that lowers fees and makes cross-border transfers more accessible by matching opposite transfers (like CAD to KES and KES to CAD), paying each out domestically, and sending only the unmatched remainder across the border as USDC on Stellar.
 
+Contract Key: CBWQSYQH2DZDJ4IXWBWNN35KWJR6BKADT6YBCJJ2XJHXY7E3325WRQKE
+
 ---
 
 ## The problem
