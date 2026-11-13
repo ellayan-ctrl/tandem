@@ -391,6 +391,11 @@ class OrderService:
         order = self.get(order_id)
         act = action or POLICY_ACTION[order["remainder_policy"]]
         if act == "payout":
+            if action == "payout" and order["status"] in ("open", "partially_matched") and order["deadline_at"] > now_ms():
+                # The sender chose to send the rest now: close their matching window first. The
+                # contract refuses to settle before the deadline, so the deadline must move to now.
+                self.expire_now([order_id])
+                order = self.get(order_id)
             return await self._payout(order)
         if act == "convert" and not conversion:
             conversion = simulated_conversion(order)

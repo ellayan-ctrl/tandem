@@ -6,6 +6,31 @@ import { isValidStellarPublicKey } from '../services/stellarTestnet';
 import { MethodSelect } from './MethodSelect';
 import { SavingsComparison } from './SavingsComparison';
 
+/** Longest matching window the server accepts (7 days). */
+const MAX_WINDOW_MINUTES = 7 * 24 * 60;
+/** Slider stops, in minutes: fine-grained for short windows, coarser for long ones. */
+const WINDOW_STOPS = [
+  1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 960, 1440, 2160, 2880, 4320, 5760, 7200, 8640, 10080,
+];
+const WINDOW_PRESETS = [
+  { label: '15m', minutes: 15 },
+  { label: '30m', minutes: 30 },
+  { label: '1h', minutes: 60 },
+  { label: '6h', minutes: 360 },
+  { label: '24h', minutes: 1440 },
+];
+/** Index of the slider stop closest to `minutes` (so presets and exact values move the slider too). */
+const nearestStop = (minutes) =>
+  WINDOW_STOPS.reduce((best, m, i) => (Math.abs(m - minutes) < Math.abs(WINDOW_STOPS[best] - minutes) ? i : best), 0);
+/** 45 -> "45 min", 90 -> "1 h 30 min", 2160 -> "1 day 12 h" */
+const formatWindow = (minutes) => {
+  const d = Math.floor(minutes / 1440);
+  const h = Math.floor((minutes % 1440) / 60);
+  const m = minutes % 60;
+  const parts = [d && `${d} day${d > 1 ? 's' : ''}`, h && `${h} h`, m && `${m} min`].filter(Boolean);
+  return parts.join(' ') || '0 min';
+};
+
 /** Testnet accounts with USDC trustlines, so the Soroban remainder payout can land (demo convenience). */
 const DEMO_RECIPIENT_BY_COUNTRY = {
   Kenya: 'GC7MO3K6MUMXK3W3XWAN2XJYWO5RNPSTJXNTV5SZQAUENT7GWIFBZEUI',
@@ -23,9 +48,8 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
   const [transferMode, setTransferMode] = useState('matched_pool');
 
   // Deadline selection
-  const [deadlineMinutes, setDeadlineMinutes] = useState(60);
-  const [isCustomDeadline, setIsCustomDeadline] = useState(false);
-  const [customMinutesInput, setCustomMinutesInput] = useState('45');
+  // Matching window length in minutes (1 min .. 7 days, the server's limit).
+  const [windowMinutes, setWindowMinutes] = useState(60);
 
   // Unmatched remainder always settles in USDC on Soroban.
   const remainderPolicy = 'direct_stellar_fallback';
@@ -70,7 +94,7 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
 
   const parsedAmount = parseFloat(amount) || 0;
   const effectiveMinutes =
-    transferMode === 'direct_instant' ? 0 : isCustomDeadline ? Math.max(1, parseInt(customMinutesInput) || 1) : deadlineMinutes;
+    transferMode === 'direct_instant' ? 0 : windowMinutes;
 
   const expiryDate = new Date(Date.now() + effectiveMinutes * 60 * 1000);
   const formattedExpiryTime = expiryDate.toLocaleTimeString([], {
@@ -392,28 +416,40 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
             <div className="flex justify-between items-baseline">
               <label className="font-semibold text-slate-900 dark:text-white">Matching Window</label>
               <span className="text-slate-500 font-mono-numbers">
-                Closes at {formattedExpiryTime} ({effectiveMinutes}m)
+                {formatWindow(windowMinutes)} · closes at {formattedExpiryTime}
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: '15m', minutes: 15 },
-                { label: '30m', minutes: 30 },
-                { label: '1h', minutes: 60 },
-                { label: '2h', minutes: 120 },
-                { label: '6h', minutes: 360 },
-                { label: '24h', minutes: 1440 },
-              ].map((item) => {
-                const isSelected = !isCustomDeadline && deadlineMinutes === item.minutes;
+            {/* Slider: graduated stops so short and long windows are both easy to pick */}
+            <div className="space-y-1">
+              <input
+                type="range"
+                min={0}
+                max={WINDOW_STOPS.length - 1}
+                step={1}
+                value={nearestStop(windowMinutes)}
+                onChange={(e) => setWindowMinutes(WINDOW_STOPS[Number(e.target.value)])}
+                aria-label="Matching window length"
+                aria-valuetext={formatWindow(windowMinutes)}
+                className="w-full accent-slate-900 dark:accent-white cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono-numbers">
+                <span>1 min</span>
+                <span>1 h</span>
+                <span>6 h</span>
+                <span>1 day</span>
+                <span>7 days</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {WINDOW_PRESETS.map((item) => {
+                const isSelected = windowMinutes === item.minutes;
                 return (
                   <button
                     key={item.minutes}
                     type="button"
-                    onClick={() => {
-                      setIsCustomDeadline(false);
-                      setDeadlineMinutes(item.minutes);
-                    }}
+                    onClick={() => setWindowMinutes(item.minutes)}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
                       isSelected
                         ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
@@ -424,34 +460,25 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
                   </button>
                 );
               })}
-
-              <button
-                type="button"
-                onClick={() => setIsCustomDeadline(true)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                  isCustomDeadline
-                    ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                }`}
-              >
-                Custom
-              </button>
-            </div>
-
-            {isCustomDeadline && (
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-slate-500">Wait up to:</span>
+              <label className="flex items-center gap-1.5 ml-auto text-slate-500">
+                Exact:
                 <input
                   type="number"
                   min="1"
-                  max="1440"
-                  value={customMinutesInput}
-                  onChange={(e) => setCustomMinutesInput(e.target.value)}
+                  max={MAX_WINDOW_MINUTES}
+                  value={windowMinutes}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v)) setWindowMinutes(Math.min(MAX_WINDOW_MINUTES, Math.max(1, v)));
+                  }}
                   className="w-20 px-2 py-1 text-xs font-mono font-medium border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900"
                 />
-                <span className="text-slate-500">minutes</span>
-              </div>
-            )}
+                min
+              </label>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Longer windows give more time to find a match (cheaper); shorter ones send the unmatched part sooner.
+            </p>
 
             {/* Unmatched remainder: always USDC via Soroban */}
             <div data-tour="remainder-policy" className="pt-3 border-t border-slate-100 dark:border-slate-700">
