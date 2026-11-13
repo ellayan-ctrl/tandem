@@ -13,6 +13,7 @@ export const Header = ({
   const navTabs = [
     { id: 'send', label: 'Send' },
     { id: 'dashboard', label: 'Live Orders', count: activeOrdersCount },
+    { id: 'mine', label: 'My Transactions' },
     { id: 'corridors', label: 'Transaction History' },
     { id: 'calculator', label: 'Calculator' },
     { id: 'docs', label: 'Documentation' },

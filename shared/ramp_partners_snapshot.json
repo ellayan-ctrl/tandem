@@ -1,0 +1,880 @@
+{
+ "$comment": "Offline fallback for /api/ramps. Snapshot of the Stellar Scout partner directory (https://stellarlight.xyz/api/partners?type=anchor&all=1), the source Raven's scout.getPartners reads. The server fetches it live and uses this only when Scout is unreachable.",
+ "generatedAt": "2026-11-13T00:55:23.651Z",
+ "partners": [
+  {
+   "slug": "etherfuse",
+   "name": "Etherfuse",
+   "partnerType": "anchor",
+   "pilot": true,
+   "tagline": "Local-currency stablecoins & tokenized-asset infrastructure",
+   "websiteUrl": "https://etherfuse.com",
+   "url": "https://stellarlight.xyz/partners/etherfuse",
+   "country": "Mexico",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "ustry",
+    "cetes",
+    "tesouro",
+    "mex",
+    "cetesz",
+    "eurob",
+    "ktb",
+    "gilts",
+    "mexe"
+   ],
+   "seps": [],
+   "assets": [
+    "USTRY",
+    "CETES",
+    "TESOURO",
+    "MEX",
+    "CETESZ",
+    "EUROB",
+    "KTB",
+    "GILTS",
+    "MEXe",
+    "USDC"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": "2026-07-02T14:59:31.795Z",
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "transparent-network",
+   "name": "Transparent Network",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Transparent Network (TPN), the world's first instant payment network using a public blockchain. TPN is an innovative platform empowering cos",
+   "websiteUrl": "https://prozora.network",
+   "url": "https://stellarlight.xyz/partners/transparent-network",
+   "country": "Ukraine",
+   "regions": [
+    "europe"
+   ],
+   "rampTypes": null,
+   "services": [
+    "uah"
+   ],
+   "seps": [],
+   "assets": [
+    "UAH"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": "2026-07-02T05:17:13.125Z",
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "aps-money",
+   "name": "APS Money",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "We handle the payments. You handle the business.",
+   "websiteUrl": "https://www.aps.money",
+   "url": "https://stellarlight.xyz/partners/aps-money",
+   "country": null,
+   "regions": [
+    "global"
+   ],
+   "rampTypes": null,
+   "services": [
+    "apsbrlm",
+    "apsclpm",
+    "apseurm",
+    "apsidrm",
+    "apsinrm",
+    "apskztm",
+    "apsmyrm",
+    "apspenm",
+    "apsrubm",
+    "apsthbm"
+   ],
+   "seps": [],
+   "assets": [
+    "APSBRLM",
+    "APSCLPM",
+    "APSEURM",
+    "APSIDRM",
+    "APSINRM",
+    "APSKZTM",
+    "APSMYRM",
+    "APSPENM",
+    "APSRUBM",
+    "APSTHBM",
+    "APSUAHM",
+    "APSUSDM",
+    "APSVNDM"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": "2026-07-02T05:17:12.971Z",
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "clpx",
+   "name": "CLPX",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "CLPX software created and trades CLPX (Chile PESO COIN).",
+   "websiteUrl": "https://clpx.finance",
+   "url": "https://stellarlight.xyz/partners/clpx",
+   "country": "Chile",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "sep-6",
+    "sep-24",
+    "sep-31",
+    "on-ramp",
+    "off-ramp",
+    "clpx"
+   ],
+   "seps": [
+    "sep-6",
+    "sep-24",
+    "sep-31"
+   ],
+   "assets": [
+    "CLPX"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": "2026-07-02T05:17:12.840Z",
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "finclusive",
+   "name": "FinClusive",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "To Be Inclusive, You Must Know Your Customers!",
+   "websiteUrl": "https://finclusive.com",
+   "url": "https://stellarlight.xyz/partners/finclusive",
+   "country": "United States",
+   "regions": [
+    "global"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "sep-6",
+    "sep-24",
+    "sep-31",
+    "on-ramp",
+    "off-ramp",
+    "xlm",
+    "usdc"
+   ],
+   "seps": [
+    "sep-6",
+    "sep-24",
+    "sep-31"
+   ],
+   "assets": [
+    "XLM",
+    "USDC"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": "2026-07-02T05:17:12.715Z",
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "zeam-money",
+   "name": "Zeam Money",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Zeam Money is issued by Zeam Limited (UK) and operated by Paytec Technologies B.V. (NL)",
+   "websiteUrl": "https://zeam.money",
+   "url": "https://stellarlight.xyz/partners/zeam-money",
+   "country": "United Kingdom",
+   "regions": [
+    "africa",
+    "europe"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "sep-24",
+    "sep-31",
+    "on-ramp",
+    "off-ramp",
+    "zarz",
+    "usdz",
+    "xauz",
+    "btcz",
+    "eurz",
+    "yzarz",
+    "gbpz",
+    "rcaps"
+   ],
+   "seps": [
+    "sep-24",
+    "sep-31"
+   ],
+   "assets": [
+    "ZARZ",
+    "USDZ",
+    "XAUZ",
+    "BTCZ",
+    "EURZ",
+    "yZARZ",
+    "GBPZ",
+    "RCAPS"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": "2026-07-02T05:17:12.590Z",
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-ripe-money",
+   "name": "Ripe Money",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Stablecoin off-ramp for Asia — pay and get paid without a bank",
+   "websiteUrl": "https://ripe.money/",
+   "url": "https://stellarlight.xyz/partners/anchor-ripe-money",
+   "country": "Singapore",
+   "regions": [
+    "asia"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-alfred-pay",
+   "name": "Alfred Pay",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Stablecoin-to-local-rails cross-border payments across Latin America",
+   "websiteUrl": "https://alfredpay.io/",
+   "url": "https://stellarlight.xyz/partners/anchor-alfred-pay",
+   "country": null,
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-boss-pay",
+   "name": "Boss Pay",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Stellar-based wallet to store, send and exchange money across Africa",
+   "websiteUrl": "https://www.bossmoney.com",
+   "url": "https://stellarlight.xyz/partners/anchor-boss-pay",
+   "country": "United States",
+   "regions": [
+    "north-america",
+    "africa",
+    "latam"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-clickspesa",
+   "name": "Clickspesa",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Payments, financial and risk management solutions for businesses in Tanzania",
+   "websiteUrl": "https://clickpesa.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-clickspesa",
+   "country": "Tanzania",
+   "regions": [
+    "africa"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-ping",
+   "name": "Ping",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Global dollar and crypto accounts — receive and manage money anywhere",
+   "websiteUrl": "https://letsping.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-ping",
+   "country": "Argentina",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-trace-finance",
+   "name": "Trace Finance",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Payments and stablecoin infrastructure for Brazil and LatAm",
+   "websiteUrl": "https://tracefinance.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-trace-finance",
+   "country": "Brazil",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-anclap",
+   "name": "Anclap",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Fintech Services",
+   "websiteUrl": "https://anclap.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-anclap",
+   "country": "Argentina",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "sep-6",
+    "sep-24",
+    "on-ramp",
+    "off-ramp",
+    "pen",
+    "ars"
+   ],
+   "seps": [
+    "sep-6",
+    "sep-24"
+   ],
+   "assets": [
+    "PEN",
+    "ARS"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-cash-abroad",
+   "name": "Cash Abroad",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Instant MXN–USDC conversion and cross-border payments for LatAm businesses",
+   "websiteUrl": "https://cashabroad.one/",
+   "url": "https://stellarlight.xyz/partners/anchor-cash-abroad",
+   "country": "Mexico",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-coins-ph",
+   "name": "Coins PH",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Pay. Send. Trade — The Super App for Filipinos",
+   "websiteUrl": "https://coins.ph/",
+   "url": "https://stellarlight.xyz/partners/anchor-coins-ph",
+   "country": "Philippines",
+   "regions": [
+    "asia"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-honey-coin",
+   "name": "Honey Coin",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "The future of international finance.",
+   "websiteUrl": "https://honeycoin.app/",
+   "url": "https://stellarlight.xyz/partners/anchor-honey-coin",
+   "country": "Kenya",
+   "regions": [
+    "africa"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "mobile-money-on-off-ramp",
+    "m-pesa-airtel-mtn-momo-rails",
+    "usdc-usdt-off-ramp-africa",
+    "virtual-accounts-kes-usd-ghs-ngn"
+   ],
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-mykobo",
+   "name": "MYKOBO",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Set your payments free...",
+   "websiteUrl": "https://mykobo.co/",
+   "url": "https://stellarlight.xyz/partners/anchor-mykobo",
+   "country": null,
+   "regions": [
+    "europe"
+   ],
+   "rampTypes": null,
+   "services": [
+    "sep-6",
+    "sep-24",
+    "sep-31",
+    "eurc"
+   ],
+   "seps": [
+    "sep-6",
+    "sep-24",
+    "sep-31"
+   ],
+   "assets": [
+    "EURC"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-fonbnk",
+   "name": "Fonbnk",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "The stablecoin settlement layer for global commerce.",
+   "websiteUrl": "https://fonbnk.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-fonbnk",
+   "country": null,
+   "regions": [
+    "africa"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-yellow-card",
+   "name": "Yellow Card",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "The Infrastructure for Modern Money Movement",
+   "websiteUrl": "https://yellowcard.io/",
+   "url": "https://stellarlight.xyz/partners/anchor-yellow-card",
+   "country": null,
+   "regions": [
+    "africa"
+   ],
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-bitso",
+   "name": "Bitso",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Discover what your money is capable of",
+   "websiteUrl": "https://bitso.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-bitso",
+   "country": "Mexico",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-moneygram",
+   "name": "Moneygram",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "Cash in and out of USDC at participating MoneyGram locations.",
+   "websiteUrl": "https://moneygram.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-moneygram",
+   "country": null,
+   "regions": [
+    "global"
+   ],
+   "rampTypes": [
+    "on-ramp",
+    "off-ramp"
+   ],
+   "services": [
+    "sep-24",
+    "on-ramp",
+    "off-ramp",
+    "usdc"
+   ],
+   "seps": [
+    "sep-24"
+   ],
+   "assets": [
+    "USDC"
+   ],
+   "freshness": {
+    "status": "aging",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": false
+   },
+   "trust": {
+    "score": 0.46,
+    "label": "medium",
+    "freshness": 0.6,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "ntokens",
+   "name": "nTokens",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": "nTokens - Brazilian Real (BRL) Currency Anchor",
+   "websiteUrl": "https://ntokens.com",
+   "url": "https://stellarlight.xyz/partners/ntokens",
+   "country": "Brazil",
+   "regions": [
+    "latam"
+   ],
+   "rampTypes": [
+    "off-ramp"
+   ],
+   "services": [
+    "sep-6",
+    "sep-24",
+    "sep-31",
+    "off-ramp",
+    "brl"
+   ],
+   "seps": [
+    "sep-6",
+    "sep-24",
+    "sep-31"
+   ],
+   "assets": [
+    "BRL"
+   ],
+   "freshness": {
+    "status": "archived",
+    "lastPartnerUpdateAt": "2026-07-02T05:17:11.801Z",
+    "isCurrent": false,
+    "excludeFromMatching": true
+   },
+   "trust": {
+    "score": 0.16,
+    "label": "low",
+    "freshness": 0.1,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-elroy-app",
+   "name": "Elroy App",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": null,
+   "websiteUrl": "https://elroy.app/",
+   "url": "https://stellarlight.xyz/partners/anchor-elroy-app",
+   "country": null,
+   "regions": null,
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "archived",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": true
+   },
+   "trust": {
+    "score": 0.16,
+    "label": "low",
+    "freshness": 0.1,
+    "verification": 0.25
+   }
+  },
+  {
+   "slug": "anchor-wallet-guru",
+   "name": "Wallet Guru",
+   "partnerType": "anchor",
+   "pilot": false,
+   "tagline": null,
+   "websiteUrl": "https://mywalletguru.com/",
+   "url": "https://stellarlight.xyz/partners/anchor-wallet-guru",
+   "country": null,
+   "regions": null,
+   "rampTypes": null,
+   "services": null,
+   "seps": null,
+   "assets": null,
+   "freshness": {
+    "status": "archived",
+    "lastPartnerUpdateAt": null,
+    "isCurrent": false,
+    "excludeFromMatching": true
+   },
+   "trust": {
+    "score": 0.16,
+    "label": "low",
+    "freshness": 0.1,
+    "verification": 0.25
+   }
+  }
+ ]
+}

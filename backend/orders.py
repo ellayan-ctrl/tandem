@@ -191,6 +191,13 @@ class OrderService:
     def list(self) -> list:
         return self.db.execute("SELECT * FROM orders ORDER BY created_at DESC, id DESC").fetchall()
 
+    def list_for_wallet(self, wallet: str) -> list:
+        """Orders this wallet sent or is the recipient of, newest first."""
+        return self.db.execute(
+            "SELECT * FROM orders WHERE sender_address = ? OR recipient_address = ? ORDER BY created_at DESC, id DESC",
+            (wallet, wallet),
+        ).fetchall()
+
     def fills_for(self, order_id: int) -> list:
         return self.db.execute(
             "SELECT * FROM fills WHERE order_a_id = ? OR order_b_id = ? ORDER BY id", (order_id, order_id)

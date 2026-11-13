@@ -19,6 +19,8 @@ stellar contract invoke --id CBWQSYQH2DZDJ4IXWBWNN35KWJR6BKADT6YBCJJ2XJHXY7E3325
 
 `stats` returns the settlement count, total order volume, the part matched off-chain, and the part settled on-chain.
 
+**Example payout:** [this transaction](https://stellar.expert/explorer/testnet/tx/ec2d7c10cfe07c6b66c0d605eb66af01f2c488c818b538bf813b26fcc0f43025) settled a 10 USD order of which 3 had matched locally: the contract was called with total 10 and matched 3 and moved exactly 7 USDC. The matched 3 never went on-chain. Step-by-step checks, with and without running the app: [docs/TESTING.md](docs/TESTING.md).
+
 ## How it works
 
 Users link a payment method (simulated in this demo). TwoWay creates a hidden Stellar wallet behind it; users never handle keys or USDC.
@@ -29,6 +31,8 @@ Users link a payment method (simulated in this demo). TwoWay creates a hidden St
 4. **Timer runs out.** Only now is the unmatched amount known. It is debited from the sender's account, converted to USDC (a testnet treasury stands in for the on-ramp), and the contract pays the recipient.
 
 Matching and routing: [`backend/matching.py`](backend/matching.py), [`backend/orders.py`](backend/orders.py).
+
+**My Transactions** shows only the signed-in account's own transfers, both sent and received, each with its Stellar Expert link. Below it, **Cash in & cash out** lists services that convert local money to and from USDC on Stellar for the account's country. The list is fetched live from the public [Stellar Scout partner directory](https://stellarlight.xyz/partners), the data behind the Raven MCP server's `scout.getPartners`, and falls back to a dated copy if the directory is offline ([`backend/ramps.py`](backend/ramps.py)).
 
 ### The contract
 
@@ -59,7 +63,7 @@ For production: `npm run build && npm start`.
 
 | Command | What it checks |
 |---|---|
-| `npm test` | 42 Python tests: matching, chain routing, balance holds, validation, wallet encryption |
+| `npm test` | 47 Python tests: matching, chain routing, balance holds, validation, wallet encryption, sent/received views, ramp ranking |
 | `npm run test:contract` | 11 Soroban contract tests: deadline, amounts, double settlement, allowance, pause, auth |
 | `npm run test:testnet` | End to end on Testnet (app must be running), with the real timer. Verifies the result **directly on the blockchain**: the contract's own settlement record, the transaction on Horizon, and the recipient's balance. Prints Stellar Expert links. Add `-- --check` to check your setup first, `-- --routing` to also test chain routing. See [docs/TESTING.md](docs/TESTING.md). |
 

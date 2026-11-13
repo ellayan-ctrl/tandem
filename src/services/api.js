@@ -50,6 +50,11 @@ export const api = {
   me: () => call('/accounts/me'),
   addBank: (input) => call('/accounts/me/banks', { body: input }),
   deposit: (bankId, amount) => call('/accounts/me/deposit', { body: { bankId, amount } }),
+  // What this account sent and received (each row has direction: 'sent' | 'received').
+  myTransactions: () => call('/accounts/me/transactions'),
+
+  // ---- cash in / cash out services (live from the Stellar Scout partner directory)
+  ramps: (country) => call(country ? `/ramps?country=${encodeURIComponent(country)}` : '/ramps'),
 
   // ---- orders
   orders: () => call('/orders'),

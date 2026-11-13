@@ -20,6 +20,7 @@ from .config import config
 from .errors import ChainError, HttpError
 from .orders import OrderService
 from .pricing import overseas_pricing
+from .ramps import ramps_for
 from .shared_data import FUNDING_KINDS, find_provider, mask_details
 
 log = logging.getLogger("twoway.api")
@@ -125,6 +126,15 @@ def serialize(o: sqlite3.Row, fills: list, viewer: Optional[str]) -> dict:
     return anon
 
 
+def serialize_received(o: sqlite3.Row, fills: list) -> dict:
+    """An order as its RECIPIENT sees it: who sent it and what arrived, without the sender's payment
+    method, notes or errors. The payout transaction is public on-chain anyway, so it is included."""
+    full = _serialize_full(o, fills)
+    view = {k: v for k, v in full.items() if k not in ("fundingMethod", "payoutError", "convertedRemainderFiat", "notes", "depositTxHash")}
+    view["matchHistory"] = [{k: v for k, v in m.items() if k != "funding"} for m in full["matchHistory"]]
+    return view
+
+
 def serialize_batch(s: dict) -> dict:
     return {
         "batchId": s["batchId"],
@@ -216,6 +226,20 @@ def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> AP
         accounts.add_bank(account, await _body(req))
         return accounts.view(accounts.get(account["id"]))
 
+    @r.get("/accounts/me/transactions")
+    async def my_transactions(req: Request):
+        """Everything this account sent or received. Sent orders show in full; received ones without
+        the sender's private details."""
+        wallet = require_account(req)["wallet_public"]
+        out = []
+        for o in svc.list_for_wallet(wallet):
+            fills = svc.fills_for(o["id"])
+            if o["sender_address"] == wallet:
+                out.append({"direction": "sent", **serialize(o, fills, wallet)})
+            else:
+                out.append({"direction": "received", **serialize_received(o, fills)})
+        return out
+
     @r.post("/accounts/me/deposit")
     async def deposit(req: Request):
         """Sandbox only: add money to one linked method's simulated balance."""
@@ -268,6 +292,15 @@ def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> AP
             "usdcContractId": config.usdc_contract_id,
             "operator": config.operator.public_key,
         }
+
+    @r.get("/ramps")
+    async def ramps(req: Request):
+        """Cash-in / cash-out services for a country (default: the signed-in account's country)."""
+        country = req.query_params.get("country")
+        if not country:
+            a = account_of(req)
+            country = a["country"] if a else None
+        return await ramps_for(country)
 
     @r.get("/health")
     async def health():

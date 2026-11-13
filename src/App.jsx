@@ -8,6 +8,7 @@ import { NettingCalculator } from './components/NettingCalculator';
 import { OrderReceiptModal } from './components/OrderReceiptModal';
 import { BankAccountModal } from './components/BankAccountModal';
 import { GuidedTourModal } from './components/GuidedTourModal';
+import { MyTransactions } from './components/MyTransactions';
 import { CORRIDORS } from './data/mockData';
 
 import { fetchLiveNetworkStatus } from './services/stellarTestnet';
@@ -334,6 +335,15 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'mine' && (
+          <MyTransactions
+            account={account}
+            onSelectOrder={(order) => setInspectingOrder(order)}
+            onLinkBank={() => openAccountModal()}
+            onNavigateToSend={() => setActiveTab('send')}
+          />
+        )}
+
         {activeTab === 'corridors' && (
           <CorridorVisualizer
             corridors={CORRIDORS}
@@ -401,6 +411,9 @@ export default function App() {
             </button>
             <button onClick={() => setActiveTab('dashboard')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
               Live Orders
+            </button>
+            <button onClick={() => setActiveTab('mine')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
+              My Transactions
             </button>
             <button onClick={() => setActiveTab('corridors')} className="hover:text-slate-900 dark:hover:text-white transition-colors">
               Transaction History
