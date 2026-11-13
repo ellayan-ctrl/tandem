@@ -145,7 +145,8 @@ def verify_settlement(label, order, expect_total, expect_matched, sender, recipi
         check(rec["total"] == round(expect_total * UNIT) and rec["matched"] == round(expect_matched * UNIT)
               and rec["remainder"] == round(expect_rem * UNIT),
               f"contract record: total {rec['total'] / UNIT:g}, matched {rec['matched'] / UNIT:g}, remainder {rec['remainder'] / UNIT:g}")
-        check(str(rec["from"]) == sender and str(rec["to"]) == recipient, "contract record: paid the right sender -> recipient")
+        # The SDK decodes addresses to Address objects; compare the G... strings, not their repr.
+        check(rec["from"].address == sender and rec["to"].address == recipient, "contract record: paid the right sender -> recipient")
         check(rec["settled_at"] >= rec["deadline"], "contract record: settled only after the deadline",
               f"deadline {rec['deadline']}, settled {rec['settled_at']}")
 
@@ -272,7 +273,10 @@ def scenario_routing(trio, fast):
     route = routes[0]
     cwallet = route["recipientAddress"]
     check(route["deadlineTimestamp"] <= xo["deadlineTimestamp"], "the routed transfer kept the EARLIER of the two deadlines")
-    check(usdc_balance(bwallet) == 0.0 and usdc_balance(cwallet) == 0.0, "nothing is on the blockchain yet")
+    check(usdc_balance(bwallet) == 0.0, f"nothing is on the blockchain yet: the {B} recipient holds 0 USDC")
+    # The routed recipient in C is a shared demo wallet that earlier runs already paid, so measure the
+    # change in its balance. (That its payment came after the timer is checked on Horizon below.)
+    c_before = usdc_balance(cwallet)
 
     say("\n5. Timers run out...")
     if fast:
@@ -284,7 +288,8 @@ def scenario_routing(trio, fast):
     say("\n6. Checking the results on the blockchain:")
     verify_settlement(f"the routed {A} -> {C} transfer (4 USD)", r_done, 4, 0, wallet, cwallet, fast)
     verify_settlement(f"the original order's own unmatched part (3 USD to {B})", x_done, 10, 7, wallet, bwallet, fast)
-    check(abs(usdc_balance(cwallet) - 4.0) < 1e-7, f"the {C} recipient holds exactly 4 USDC")
+    c_gain = usdc_balance(cwallet) - c_before
+    check(abs(c_gain - 4.0) < 1e-7, f"the {C} recipient received exactly 4 USDC", f"{c_before:g} -> {c_before + c_gain:g}")
     check(abs(usdc_balance(bwallet) - 3.0) < 1e-7, f"the {B} recipient holds exactly 3 USDC")
 
 
