@@ -9,14 +9,14 @@ Tandem is a peer-to-peer remittance app that lowers fees and makes cross-border 
 
 ## The problem
 
-Moving money on the Stellar network is already fast and cheap. *TODO: cite Stellar's published fee and speed figures here.*
+Moving money on the Stellar network is already fast and cheap. The minimum fee is 100 stroops (0.00001 XLM) per operation, and ledgers close in about 5 seconds.
 
 The real hurdle is everything around it:
 
 - **Accessibility.** Using blockchain to send money still means setting up wallets and learning crypto tooling.
 - **Conversion costs.** The sender pays to convert cash into transferable coins, and the recipient pays again to convert those coins back into usable cash.
 
-These costs fall hardest on people who send small amounts often. *TODO: name the specific community here. Our launch corridor is the UAE and the Philippines, where workers in the UAE send money home to families in the Philippines.*
+These costs fall hardest on people who send small amounts often. These costs fall hardest on people who send small amounts often. Our launch corridor is the UAE and the Philippines. The UAE is home to roughly 975,000 Filipinos, and it accounts for about 4.6% of the cash remittances sent to the Philippines, out of $35.63 billion in 2025, or 7.3% of the country’s GDP. That works out to roughly $1.6 billion a year from the UAE alone, and UAE cash remittances were up 4.3% year on year in the first half of 2026.
 
 ---
 
@@ -146,8 +146,4 @@ Tandem works best at scale, because more transfers in both directions means more
 - Partner with anchors so users can link their accounts and quickly convert between digital currency and cash when a transfer is sent.
 - B2B transfers across borders, to lower the cost and time delay of bulk payments.
 
----
 
-## Status
-
-*TODO: add project status, team, and how to run or contribute.*
