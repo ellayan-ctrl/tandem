@@ -122,6 +122,34 @@ Two opposite transfers without Tandem cost four conversion fees and two border c
 - Better access to Stellar's cost and speed benefits
 
 ---
+## How we built it
+
+We first noticed that Stellar's network already makes crypto transfers cheap and fast. So what's still stopping more people from using it? Two things: the high friction of setting up wallets, and the cost of converting to and from cash.
+
+We built Tandem around the idea of trading some time delay for greater savings, with users in full control of how long they're willing to wait to secure more matches.
+
+## Frameworks and tools
+
+- **Smart contract:** Rust and `soroban-sdk`, deployed to Stellar Testnet with the Stellar CLI. It runs when the timer runs out. It makes alternative payment routes more secure, prevents double payments, and keeps settlement records so everyone receives the money they're owed.
+- **Server:** Python, FastAPI, and SQLite. SQLite tracks orders, and the matching algorithms are written in Python.
+- **Front end:** React, Vite, and Tailwind CSS.
+- **Stellar infrastructure:** Soroban RPC, Horizon, and the Stellar Expert explorer, used to verify Testnet transactions.
+- **Fee comparison:** research comparing our service with current options for international transfers, compiled in a spreadsheet.
+- **Testing:** 500+ unit, smart contract, and randomized transaction tests on Testnet.
+
+## Challenges we faced
+
+### Testing on Testnet
+
+Although we tested our algorithms internally, we also built tests that run directly on Testnet. Setting up the contract's keys, using account keys funded with Friendbot, and verifying results in the hard-to-read Stellar Expert explorer was a challenge. Along the way we noticed that:
+
+- Raw amounts on the Stellar network are stored as integers with 7 decimal places, so 1 unit of a token is 10,000,000 raw units.
+- When a transaction is fully matched, nothing gets sent on Stellar.
+
+### Balancing savings and transfer speed
+
+Designing a user-controlled timer was difficult, because the timer length affects which matches can form and how much has to be sent on the blockchain.
+
 
 ## Business model
 
