@@ -1,4 +1,4 @@
-"""TwoWay Stellar server: SQLite order book, bilateral matching, off-chain netting of matched
+"""Tandem server: SQLite order book, bilateral matching, off-chain netting of matched
 volume, and Soroban settlement of only the unmatched remainder when a matching window closes."""
 
 import os as _os

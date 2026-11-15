@@ -23,7 +23,7 @@ export const GuidedTourModal = ({ isOpen, onClose, onNavigateToTab, activeTab })
       badge: 'Step 2 of 6 · Countries',
       title: 'Countries & Amount',
       description:
-        'Choose the two countries you are sending between (e.g. Canada ⇄ Kenya). Two-Way Street matches your outgoing funds against opposite-direction flows (e.g. Kenya → Canada) without cross-border banking rails.',
+        'Choose the two countries you are sending between (e.g. Canada ⇄ Kenya). Tandem matches your outgoing funds against opposite-direction flows (e.g. Kenya → Canada) without cross-border banking rails.',
       preferredPosition: 'bottom',
     },
     {

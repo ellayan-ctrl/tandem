@@ -5,7 +5,7 @@ import { test } from 'node:test';
 
 import { bankMarkupFee, corridorCosts, domesticFee, loadFeeSheet, overseasFee, parseCsv } from './feeSheet.js';
 
-const SHEETS = ['verified_fee_matrix.csv', 'matched_fee_matrix.csv'].map((f) => ({
+const SHEETS = ['verified_fee_matrix.csv'].map((f) => ({
   file: f,
   text: readFileSync(new URL(`../../shared/fees/${f}`, import.meta.url), 'utf8'),
 }));
@@ -72,7 +72,7 @@ for (const { file, text } of SHEETS) {
     }
   });
 
-  test(`${file}: TwoWay costs add up at every matched amount`, () => {
+  test(`${file}: Tandem costs add up at every matched amount`, () => {
     const net = { preauth: 0.0001, payout: 0.0018 };
     for (const row of loadFeeSheet(text)) {
       const fx = 1 + Math.random() * 100;
@@ -82,12 +82,12 @@ for (const { file, text } of SHEETS) {
         assert.ok(Math.abs(c.matched + c.unmatched - 1000) < 1e-9);
         // Full crypto: ramps on the whole amount, independent of matching.
         assert.ok(Math.abs(c.fullCrypto.total - (1000 * 2.6) / 100 - net.payout) < 1e-9);
-        // TwoWay: domestic fee on the matched part (from the sheet, converted at fx) + crypto on the rest.
+        // Tandem: domestic fee on the matched part (from the sheet, converted at fx) + crypto on the rest.
         const expectedDomestic = domesticFee(row, matchedUsd * fx).high / fx;
         const expectedCrypto = c.unmatched > 0 ? (c.unmatched * 2.6) / 100 + net.payout : 0;
         assert.ok(Math.abs(c.twoWay.total - (expectedDomestic + net.preauth + expectedCrypto)) < 1e-9, row.id);
       }
-      // Nothing matched: TwoWay is the full crypto route plus the pre-authorization fee.
+      // Nothing matched: Tandem is the full crypto route plus the pre-authorization fee.
       const none = corridorCosts(row, { ...opts, matchedUsd: 0 });
       assert.ok(Math.abs(none.twoWay.total - none.fullCrypto.total - net.preauth) < 1e-9);
       // Everything matched: no ramps at all.

@@ -240,7 +240,7 @@ export const TransactionDashboard = ({
             </div>
           </div>
           <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-            Two-Way Street relies on <strong>bilateral opposite-direction demand</strong> between the same two countries. For example, a
+            Tandem relies on <strong>bilateral opposite-direction demand</strong> between the same two countries. For example, a
             transfer from <strong>Canada → Kenya</strong> only matches when someone else submits a transfer from{' '}
             <strong>Kenya → Canada</strong>. Until a match is found, the money you want to send simply stays where it is: in your bank
             account, or with the agent or mobile wallet (MoneyGram, M-Pesa…) where you paid it in. Nothing is converted to crypto yet.

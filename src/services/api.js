@@ -1,5 +1,5 @@
 /**
- * Client for the TwoWay server: linked bank accounts (simulated), the SQLite order book and
+ * Client for the Tandem server: linked bank accounts (simulated), the SQLite order book and
  * matching, and settlement of unmatched remainders as USDC via Stellar Blockchain.
  *
  * Users never handle keys: linking a bank creates an invisible, server-held Stellar wallet, and

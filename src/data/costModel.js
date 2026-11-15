@@ -13,7 +13,7 @@ export const NETWORK_FEES = {
   classicPayment: 100,
   /** USDC `approve` pre-authorization (Soroban), fee_charged on our testnet txs: 5,825–5,896. MEASURED */
   preauthApprove: 5_896,
-  /** `settle_remainder` on the TwoWay contract (deadline check, settlement record, transfer_from), fee_charged on our
+  /** `settle_remainder` on the Tandem contract (deadline check, settlement record, transfer_from), fee_charged on our
    * testnet txs: 69,468–88,902 (the record is a new persistent entry, so it pays storage rent). MEASURED */
   sorobanPayout: 88_902,
 };
@@ -21,11 +21,13 @@ export const NETWORK_FEES = {
 /** XLM/USD, Nov 2026 quotes ranged ~$0.14–$0.21 across exchanges. SOURCED (editable) */
 export const DEFAULT_XLM_USD = 0.2;
 
-/** Sender on-ramp: CAD -> USDC via a Canadian exchange funded by Interac (~0.5–0.7% all-in). SOURCED (vendor comparisons) */
+/** Sender on-ramp: local money -> USDC, funded from a bank. Researched Nov 2026: 0.2% (Kraken order book, free ACH) to 1%
+ * (MoonPay bank transfer); Canadian exchanges ~0.5–0.7%. 0.6% is the midpoint. Card funding (3.5–4%) is not assumed. SOURCED */
 export const ONRAMP_PCT = 0.6;
 
-/** Recipient off-ramp: USDC -> local currency via a stablecoin anchor (Kenya 1–3%; Kotani Pay sample ≈2%). SOURCED */
-export const OFFRAMP_PCT = 2.0;
+/** Recipient off-ramp: USDC -> local currency. Researched Nov 2026: 0.5–1% spread on Coins.ph (Philippines), 1% flat on
+ * Transak, 1–2% typical on/off-ramp cash-out, Kotani Pay sample ≈2% (Kenya). 1.5% is the midpoint of the 1–2% range. SOURCED */
+export const OFFRAMP_PCT = 1.5;
 
 /** Cash-out from mobile money in Kenya: ~KES 8 per KES 1,000 received (CBK/KNBS/FSD 2025 survey). SOURCED */
 export const MOBILE_CASHOUT_PCT = 0.8;
@@ -52,7 +54,7 @@ export const FUNDING_COST_PCT = {
 /** Recipient collects the matched amount locally (partner network). Kenya: ≈ KES 8 per 1,000. SOURCED */
 export const LOCAL_DELIVERY_PCT = 0.8;
 
-/** TwoWay platform fee: none charged today. */
+/** Tandem platform fee: none charged today. */
 export const TWOWAY_PLATFORM_PCT = 0;
 
 const xlmUsd = (stroops, price) => (stroops / STROOPS_PER_XLM) * price;
@@ -143,13 +145,13 @@ export function computeCosts(i) {
       { label: `Unmatched: cash-out (${MOBILE_CASHOUT_PCT}%)`, usd: (unmatched * MOBILE_CASHOUT_PCT) / 100, basis: 'sourced' },
     );
   }
-  twoWayLines.push({ label: 'TwoWay platform fee', usd: (A * TWOWAY_PLATFORM_PCT) / 100, basis: 'sourced', detail: 'None charged today' });
-  const twoWay = rail('twoway', 'TwoWay (netting + Soroban remainder)', twoWayLines, A);
+  twoWayLines.push({ label: 'Tandem platform fee', usd: (A * TWOWAY_PLATFORM_PCT) / 100, basis: 'sourced', detail: 'None charged today' });
+  const twoWay = rail('twoway', 'Tandem (netting + Soroban remainder)', twoWayLines, A);
 
   return [traditional, bankWire, directStellar, twoWay];
 }
 
-/** Total on-chain cost of one TwoWay order, in XLM and USD. */
+/** Total on-chain cost of one Tandem order, in XLM and USD. */
 export function twoWayNetworkCost(hasRemainder, price) {
   const stroops = NETWORK_FEES.preauthApprove + (hasRemainder ? NETWORK_FEES.sorobanPayout : 0);
   return { stroops, xlm: stroops / STROOPS_PER_XLM, usd: xlmUsd(stroops, price) };
@@ -172,6 +174,9 @@ export const COST_SOURCES = [
     url: 'https://www.photonpay.com/ca/blog/article/cad-to-usdc-pricing-comparison',
   },
   { label: 'Kenya stablecoin vs M-Pesa costs (1.5–3% all-in)', url: 'https://www.spark.money/tools/m-pesa-vs-stablecoin-kenya' },
+  { label: 'Buying USDC from a bank: exchange fees compared (0.2–1% on-ramp)', url: 'https://eco.com/support/en/articles/15082535-how-to-buy-usdc-exchanges-wallets-lowest-fee-routes' },
+  { label: 'USDC to Philippine peso off-ramp costs (0.5–2%)', url: 'https://www.spark.money/tools/gcash-vs-stablecoin-philippines' },
+  { label: 'Stablecoin off-ramps compared, 2026 (USDC cash-out routes)', url: 'https://eco.com/support/en/articles/15210579-best-stablecoin-offramps-2026-cash-out-routes-compared' },
   { label: 'Kotani Pay off-ramp rate API (sample fee ≈2%)', url: 'https://developers.kotanipay.com/v3/api-reference/rates/offramp-rate' },
   { label: 'Kenya remittance encashing cost ≈KES 8 per 1,000 (CBK/KNBS/FSD survey)', url: 'https://businesstoday.co.ke/?p=153233' },
   { label: 'M-Pesa 2026 tariffs', url: 'https://businesstoday.co.ke/m-pesa-charges-2026-withdrawal-and-send-money-fees/' },

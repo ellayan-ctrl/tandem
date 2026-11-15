@@ -6,7 +6,7 @@ const NAV_TABS = [
   { id: 'send', label: 'Send' },
   { id: 'dashboard', label: 'Live orders', countKey: true },
   { id: 'mine', label: 'My transfers' },
-  { id: 'corridors', label: 'History' },
+  { id: 'corridors', label: 'Transaction history' },
   { id: 'calculator', label: 'Calculator' },
   { id: 'demo', label: 'Demo & tests' },
 ];

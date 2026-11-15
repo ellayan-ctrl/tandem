@@ -269,7 +269,7 @@ export async function submitRealUsdcPayment(params) {
           amount: paymentAmount,
         }),
       )
-      .addMemo(Memo.text((params.memoText || 'TwoWay Netting Settlement').slice(0, 28)))
+      .addMemo(Memo.text((params.memoText || 'Tandem Netting Settlement').slice(0, 28)))
       .setTimeout(30)
       .build();
 
@@ -336,7 +336,7 @@ export async function submitRealTestnetPayment(params) {
       networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
     })
       .addOperation(op)
-      .addMemo(Memo.text((params.memoText || 'TwoWay Escrow').slice(0, 28)))
+      .addMemo(Memo.text((params.memoText || 'Tandem Escrow').slice(0, 28)))
       .setTimeout(30)
       .build();
 

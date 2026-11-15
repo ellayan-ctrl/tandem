@@ -5,7 +5,7 @@ import fxFallback from '../../shared/fx_rates.json';
 import { COST_SOURCES, DEFAULT_XLM_USD, NETWORK_FEES, OFFRAMP_PCT, ONRAMP_PCT, STROOPS_PER_XLM } from '../data/costModel';
 import { CORRIDORS } from '../data/corridors';
 import { corridorCosts } from '../data/feeSheet';
-import { SHEETS } from '../data/sheets';
+import { FEE_ROWS, FEE_SHEET_FILE } from '../data/sheets';
 const MAX_AMOUNT = 1000;
 const FX_URL = 'https://open.er-api.com/v6/latest/USD';
 
@@ -15,8 +15,7 @@ const pct = (v) => `${Number(v.toFixed(2))}%`;
 const money = (v, cur) => `${cur} ${Number(v.toFixed(2)).toLocaleString('en-US')}`;
 
 export const NettingCalculator = () => {
-  const [sheetId, setSheetId] = useState('verified');
-  const rows = SHEETS[sheetId].rows;
+  const rows = FEE_ROWS;
 
   // The app's country pairs (shared/corridors.json), as on every other tab.
   const [pairId, setPairId] = useState(CORRIDORS[0].id);
@@ -25,10 +24,12 @@ export const NettingCalculator = () => {
   const origin = reversed ? pair.countryB.name : pair.countryA.name;
   const dest = reversed ? pair.countryA.name : pair.countryB.name;
   const [amount, setAmount] = useState(MAX_AMOUNT);
-  const [matched, setMatched] = useState(500);
-  const [onrampPct, setOnrampPct] = useState(ONRAMP_PCT);
-  const [offrampPct, setOfframpPct] = useState(OFFRAMP_PCT);
-  const [xlmUsd, setXlmUsd] = useState(DEFAULT_XLM_USD);
+  // Share of the amount that is matched domestically, 0–100%.
+  const [matchedPct, setMatchedPct] = useState(100);
+  // Researched costs of the crypto route (src/data/costModel.js); not user-editable.
+  const onrampPct = ONRAMP_PCT;
+  const offrampPct = OFFRAMP_PCT;
+  const xlmUsd = DEFAULT_XLM_USD;
   const [fx, setFx] = useState({ rates: Object.fromEntries(Object.entries(fxFallback.rates).map(([k, v]) => [k, v.rate])), live: false, date: null });
 
   // Live FX (USD -> origin currency), falling back to the app's indicative rates.
@@ -46,9 +47,8 @@ export const NettingCalculator = () => {
   }, []);
 
   const row = rows.find((r) => r.origin === origin && r.dest === dest);
-  const otherSheet = Object.entries(SHEETS).find(([id, s]) => id !== sheetId && s.rows.some((r) => r.origin === origin && r.dest === dest));
   const rate = row ? fx.rates[row.originCurrency] : undefined;
-  const M = Math.min(matched, amount);
+  const M = (amount * matchedPct) / 100;
 
   const networkUsd = {
     preauth: (NETWORK_FEES.preauthApprove / STROOPS_PER_XLM) * xlmUsd,
@@ -57,7 +57,7 @@ export const NettingCalculator = () => {
   const params = { amountUsd: amount, fx: rate, onrampPct, offrampPct, networkUsd };
   const c = row && rate ? corridorCosts(row, { ...params, matchedUsd: M }) : null;
 
-  // TwoWay total across every matched amount, for the chart.
+  // Tandem total across every matched amount, for the chart.
   const curve = useMemo(() => {
     if (!row || !rate) return [];
     const steps = 50;
@@ -66,7 +66,7 @@ export const NettingCalculator = () => {
       return { m, total: corridorCosts(row, { ...params, matchedUsd: m }).twoWay.total };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row, rate, amount, onrampPct, offrampPct, xlmUsd]);
+  }, [row, rate, amount]);
 
   const inputCls =
     'px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white';
@@ -77,24 +77,12 @@ export const NettingCalculator = () => {
         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Cost Calculator</h1>
         <p className="mt-1 text-xs text-slate-500 max-w-3xl">
           Pick a country pair and direction, then slide how much of the transfer is matched domestically. Every corridor fee (overseas
-          provider, domestic rail, bank FX markup) is read from the fee spreadsheet <code className="text-[11px]">{SHEETS[sheetId].file}</code>;
-          change the CSV and the calculator follows.
+          provider, domestic rail, bank FX markup) is read from the fee spreadsheet <code className="text-[11px]">{FEE_SHEET_FILE}</code>.
         </p>
       </div>
 
       {/* Inputs */}
       <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-white dark:bg-slate-900 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <label className="block md:col-span-2">
-          <span className="text-slate-500 block mb-1">Fee spreadsheet</span>
-          <select value={sheetId} onChange={(e) => setSheetId(e.target.value)} className={`w-full ${inputCls}`}>
-            {Object.entries(SHEETS).map(([id, s]) => (
-              <option key={id} value={id}>
-                {s.label} ({s.rows.length} of the app's directions)
-              </option>
-            ))}
-          </select>
-        </label>
-
         <div>
           <span className="text-slate-500 block mb-1">Countries</span>
           <div className="flex items-center gap-1.5">
@@ -138,24 +126,24 @@ export const NettingCalculator = () => {
               Matched domestically
             </label>
             <span className="font-mono-numbers font-semibold text-slate-900 dark:text-white">
-              {usd(M)} matched ({amount > 0 ? Math.round((M / amount) * 100) : 0}%) · {usd(amount - M)} via crypto
+              {matchedPct}% matched ({usd(M)}) · {usd(amount - M)} via crypto
             </span>
           </div>
           <input
             id="matched"
             type="range"
             min={0}
-            max={MAX_AMOUNT}
+            max={100}
             step={1}
-            value={M}
-            onChange={(e) => setMatched(Math.min(amount, Number(e.target.value)))}
+            value={matchedPct}
+            onChange={(e) => setMatchedPct(Number(e.target.value))}
             className="w-full accent-slate-900 dark:accent-white"
-            aria-valuetext={`${usd(M)} matched domestically`}
+            aria-valuetext={`${matchedPct}% matched domestically, ${usd(M)}`}
           />
           <div className="flex justify-between text-[10px] text-slate-400 font-mono-numbers">
-            <span>$0 (fully crypto)</span>
-            <span>$500</span>
-            <span>$1,000</span>
+            <span>0% (fully crypto)</span>
+            <span>50%</span>
+            <span>100% (fully matched)</span>
           </div>
           {row && (
             <p className="text-[11px] text-slate-500 mt-1">
@@ -169,14 +157,7 @@ export const NettingCalculator = () => {
 
       {!row && (
         <div className="text-xs p-3 rounded-md bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
-          This spreadsheet has no {origin} → {dest} row.{' '}
-          {otherSheet ? (
-            <button type="button" className="underline font-semibold" onClick={() => setSheetId(otherSheet[0])}>
-              Use the {otherSheet[1].label}, which has it
-            </button>
-          ) : (
-            'Neither spreadsheet has this direction; reverse it or pick another pair.'
-          )}
+          The fee spreadsheet has no {origin} → {dest} row yet. Reverse the direction or pick another pair.
         </div>
       )}
       {row && !rate && (
@@ -232,7 +213,7 @@ export const NettingCalculator = () => {
             />
             <Card
               highlight
-              title={`TwoWay: ${usd(M)} matched, ${usd(c.unmatched)} via crypto`}
+              title={`Tandem: ${usd(M)} matched, ${usd(c.unmatched)} via crypto`}
               total={c.twoWay.total}
               amount={amount}
               lines={[
@@ -275,7 +256,7 @@ export const NettingCalculator = () => {
               )}
             </div>
             <div className="text-[11px] text-slate-500 sm:text-right font-mono-numbers">
-              TwoWay {pct(amount > 0 ? (c.twoWay.total / amount) * 100 : 0)} · full crypto {pct(amount > 0 ? (c.fullCrypto.total / amount) * 100 : 0)} ·{' '}
+              Tandem {pct(amount > 0 ? (c.twoWay.total / amount) * 100 : 0)} · full crypto {pct(amount > 0 ? (c.fullCrypto.total / amount) * 100 : 0)} ·{' '}
               {row.provider} {pct(amount > 0 ? (c.overseas / amount) * 100 : 0)} of {usd(amount)}
             </div>
           </div>
@@ -284,14 +265,27 @@ export const NettingCalculator = () => {
         </>
       )}
 
-      {/* Crypto assumptions */}
+      {/* Crypto route costs (researched, fixed) */}
       <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-white dark:bg-slate-900 text-xs space-y-2">
-        <span className="font-semibold text-slate-900 dark:text-white block">Crypto route assumptions (not in the spreadsheet; edit to test)</span>
-        <div className="flex flex-wrap gap-4">
-          <NumberField label="On-ramp %" value={onrampPct} onChange={setOnrampPct} step={0.1} />
-          <NumberField label="Off-ramp %" value={offrampPct} onChange={setOfframpPct} step={0.1} />
-          <NumberField label="XLM price $" value={xlmUsd} onChange={setXlmUsd} step={0.01} />
-        </div>
+        <span className="font-semibold text-slate-900 dark:text-white block">Crypto route costs used above</span>
+        <dl className="flex flex-wrap gap-x-8 gap-y-1 text-slate-700">
+          <div className="flex gap-2">
+            <dt className="text-slate-500">On-ramp to USDC</dt>
+            <dd className="font-semibold">{pct(onrampPct)}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="text-slate-500">Off-ramp to local money</dt>
+            <dd className="font-semibold">{pct(offrampPct)}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="text-slate-500">XLM price</dt>
+            <dd className="font-semibold">${xlmUsd.toFixed(2)}</dd>
+          </div>
+        </dl>
+        <p className="text-[11px] text-slate-500">
+          Researched November 2026: buying USDC from a bank costs about 0.2–1%, and cashing USDC out to local money about 1–2%. The
+          midpoints are used. Sources are listed below.
+        </p>
         <p className="text-[10px] text-slate-400">
           Stellar fees are measured from this app&apos;s testnet transactions: approve {NETWORK_FEES.preauthApprove.toLocaleString()} stroops, settle_remainder{' '}
           {NETWORK_FEES.sorobanPayout.toLocaleString()} stroops (1 XLM = 10,000,000 stroops). Exchange rates:{' '}
@@ -348,21 +342,7 @@ const Card = ({ title, total, totalLabel, amount, lines, highlight }) => (
   </div>
 );
 
-const NumberField = ({ label, value, onChange, step }) => (
-  <label className="flex items-center gap-2 text-slate-500">
-    {label}
-    <input
-      type="number"
-      min={0}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-      className="w-20 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md font-mono-numbers"
-    />
-  </label>
-);
-
-/** Total cost vs matched amount: TwoWay (line), full crypto and the overseas provider (flat references). */
+/** Total cost vs matched amount: Tandem (line), full crypto and the overseas provider (flat references). */
 const CostChart = ({ curve, amount, matched, fullCrypto, overseas, provider }) => {
   if (!curve.length || amount <= 0) return null;
   const W = 600;
@@ -376,7 +356,7 @@ const CostChart = ({ curve, amount, matched, fullCrypto, overseas, provider }) =
   return (
     <figure className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-white dark:bg-slate-900 text-xs">
       <figcaption className="font-semibold text-slate-900 dark:text-white mb-2">Total cost by matched amount</figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Cost of TwoWay as more of the transfer is matched, compared with sending it all via crypto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Cost of Tandem as more of the transfer is matched, compared with sending it all via crypto">
         {[0, 0.5, 1].map((f) => (
           <g key={f}>
             <line x1={pad.l} x2={W - pad.r} y1={y(maxY * f)} y2={y(maxY * f)} className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1" />
@@ -390,15 +370,15 @@ const CostChart = ({ curve, amount, matched, fullCrypto, overseas, provider }) =
         <path d={path} fill="none" className="stroke-emerald-600 dark:stroke-emerald-400" strokeWidth="2" />
         <circle cx={x(here.m)} cy={y(here.total)} r="4" className="fill-emerald-600 dark:fill-emerald-400" />
         <text x={pad.l} y={H - 6} className="fill-slate-400" fontSize="10">
-          $0 matched
+          0% matched
         </text>
         <text x={W - pad.r} y={H - 6} textAnchor="end" className="fill-slate-400" fontSize="10">
-          {usd(amount)} matched
+          100% matched
         </text>
       </svg>
       <div className="flex flex-wrap gap-4 mt-2 text-[11px] text-slate-500">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-0.5 bg-emerald-600" /> TwoWay
+          <span className="w-3 h-0.5 bg-emerald-600" /> Tandem
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-0.5 bg-amber-500" /> Fully via crypto

@@ -362,7 +362,7 @@ export const BankAccountModal = ({ isOpen, onClose, account, onLink, onAddBank, 
               {showWallet && (
                 <div className="mt-2 p-2.5 rounded bg-slate-50 dark:bg-slate-800/40 text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
                   <p>
-                    TwoWay created one Stellar wallet for you. You never manage it: it holds nothing until a transfer&apos;s window closes,
+                    Tandem created one Stellar wallet for you. You never manage it: it holds nothing until a transfer&apos;s window closes,
                     then receives exactly the unmatched amount in USDC and pays it to the recipient through the settlement contract.
                   </p>
                   <a

@@ -40,7 +40,7 @@ def create_app(serve_frontend: bool = False) -> FastAPI:
         await chain.close()
         db.close()
 
-    app = FastAPI(title="TwoWay Stellar", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
+    app = FastAPI(title="Tandem", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     install_error_handlers(app)
     app.include_router(build_router(svc, accounts, worker.kick, cashouts))
 

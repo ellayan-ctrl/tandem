@@ -49,7 +49,7 @@ const localMoney = (currency, v) => `${currency} ${v.toLocaleString('en-US', { m
 const OPEN = ['open', 'partially_matched'];
 
 export const SendTransferForm = ({ corridors, account, orders = [], onLinkBank, onOrderCreated, onNavigateToDashboard }) => {
-  const [selectedCorridorId, setSelectedCorridorId] = useState('CA-KE');
+  const [selectedCorridorId, setSelectedCorridorId] = useState('AE-PH');
   const [directionReversed, setDirectionReversed] = useState(false);
   const [amount, setAmount] = useState('10');
   const [recipientName, setRecipientName] = useState('');

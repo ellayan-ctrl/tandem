@@ -36,7 +36,7 @@ def main() -> None:
         cwd=ROOT,
         env={**os.environ, "API_PORT": str(config.api_port)},
     )
-    print(f"TwoWay on http://localhost:{config.port}  (API on :{config.api_port})", flush=True)
+    print(f"Tandem on http://localhost:{config.port}  (API on :{config.api_port})", flush=True)
     try:
         from .app import create_app
 
