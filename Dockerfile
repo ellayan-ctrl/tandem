@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend ./backend
 COPY shared ./shared
 COPY --from=web /app/dist ./dist
+RUN mkdir -p /data
 ENV PORT=3000 DB_PATH=/data/twoway.db
 EXPOSE 3000
 CMD ["python", "-m", "backend"]
