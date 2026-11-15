@@ -10,19 +10,19 @@ const describe = (b, currency) => {
     b.details.cbu ??
     b.details.phone ??
     (b.details.cardLast4 ? `•••• ${b.details.cardLast4}` : (b.details.city ?? ''));
-  return `${b.name}${ref ? ` ${ref}` : ''} · ${currency} ${b.available.toFixed(2)} available`;
+  return `${b.name}${ref ? ` ${ref}` : ''} (${currency} ${b.available.toFixed(2)})`;
 };
 
 /** Dropdown of the account's linked payment methods, plus "Link another…". */
 export const MethodSelect = ({ label, account, value, onChange, onLinkAnother, hint }) => {
   const methods = account?.banks ?? [];
   return (
-    <div>
-      <label className="text-[11px] text-slate-500 block mb-1">{label}</label>
+    <label className="block min-w-0">
+      <span className="label">{label}</span>
       <select
         value={value ?? ''}
         onChange={(e) => (e.target.value === LINK ? onLinkAnother() : onChange(Number(e.target.value)))}
-        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white focus:outline-none"
+        className="field mt-1.5 !text-sm"
       >
         {methods.length === 0 && <option value="">No payment methods linked yet</option>}
         {KIND_ORDER.map((k) => {
@@ -38,9 +38,9 @@ export const MethodSelect = ({ label, account, value, onChange, onLinkAnother, h
             </optgroup>
           );
         })}
-        <option value={LINK}>{methods.length ? '+ Link another…' : '+ Link a payment method…'}</option>
+        <option value={LINK}>{methods.length ? 'Link another payment method…' : 'Link a payment method…'}</option>
       </select>
-      {hint && <span className="text-[10px] text-slate-400 block mt-1">{hint}</span>}
-    </div>
+      {hint && <span className="block mt-1 text-sm text-slate-600">{hint}</span>}
+    </label>
   );
 };

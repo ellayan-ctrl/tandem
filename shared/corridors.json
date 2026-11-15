@@ -5,13 +5,15 @@
     "United States": { "code": "US", "flag": "🇺🇸", "currency": "USD", "sheetName": "United States", "region": "north-america" },
     "European Union": { "code": "EU", "flag": "🇪🇺", "currency": "EUR", "sheetName": "Eurozone", "region": "europe" },
     "Kenya": { "code": "KE", "flag": "🇰🇪", "currency": "KES", "sheetName": "Kenya", "region": "africa" },
-    "Philippines": { "code": "PH", "flag": "🇵🇭", "currency": "PHP", "sheetName": "Philippines", "region": "asia" }
+    "Philippines": { "code": "PH", "flag": "🇵🇭", "currency": "PHP", "sheetName": "Philippines", "region": "asia" },
+    "United Arab Emirates": { "code": "AE", "flag": "🇦🇪", "currency": "AED", "sheetName": "United Arab Emirates", "region": "mena" }
   },
   "pairs": [
     { "id": "CA-US", "a": "Canada", "b": "United States", "description": "Cross-border work, study and family transfers between Canada and the US." },
     { "id": "US-EU", "a": "United States", "b": "European Union", "description": "Freelance invoices, tuition and family support between the US and the euro area." },
     { "id": "CA-EU", "a": "Canada", "b": "European Union", "description": "Canadian diaspora and business payments to and from the euro area." },
     { "id": "CA-KE", "a": "Canada", "b": "Kenya", "description": "Diaspora remittances from Canada paired with Kenyan contractors and exporters paying Canadian vendors." },
-    { "id": "US-PH", "a": "United States", "b": "Philippines", "description": "Overseas Filipino worker remittances paired with Manila BPO and virtual-assistant billing." }
+    { "id": "US-PH", "a": "United States", "b": "Philippines", "description": "Overseas Filipino worker remittances paired with Manila BPO and virtual-assistant billing." },
+    { "id": "AE-PH", "a": "United Arab Emirates", "b": "Philippines", "description": "Launch corridor. Remittances from about 975,000 Filipinos working in the UAE, paired with payments from the Philippines to the UAE." }
   ]
 }

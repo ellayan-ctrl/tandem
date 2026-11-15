@@ -83,6 +83,26 @@ CREATE TABLE IF NOT EXISTS banks (
   created_at    INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS banks_account ON banks (account_id);
+
+-- Cash-outs of received USDC through an anchor (SEP-24). Bank details stay with the anchor, never here.
+CREATE TABLE IF NOT EXISTS cashouts (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id         INTEGER NOT NULL REFERENCES accounts(id),
+  anchor_domain      TEXT    NOT NULL,
+  anchor_tx_id       TEXT    NOT NULL UNIQUE,
+  amount_units       INTEGER NOT NULL CHECK (amount_units > 0),
+  status             TEXT    NOT NULL,   -- the anchor's SEP-24 status
+  interactive_url    TEXT,
+  payment_tx_hash    TEXT,               -- wallet -> anchor USDC payment
+  amount_out         TEXT,
+  amount_fee         TEXT,
+  message            TEXT,
+  error              TEXT,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cashouts_account ON cashouts (account_id, created_at);
+
 """
 
 

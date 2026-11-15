@@ -13,10 +13,13 @@ from typing import Optional
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from . import anchor
 from . import soroban as chain
 from .accounts import AccountService
-from .amounts import from_units, now_ms
-from .config import config
+from .amounts import format_units, from_units, now_ms
+from .cashouts import CashoutService
+from .cashouts import view as cashout_view
+from .config import ROOT, config
 from .errors import ChainError, HttpError
 from .orders import OrderService
 from .pricing import overseas_pricing
@@ -24,6 +27,7 @@ from .ramps import REGION_OF, ramps_for
 from .shared_data import FUNDING_KINDS, find_provider, mask_details
 
 log = logging.getLogger("twoway.api")
+_PAIRS = json.loads((ROOT / "shared" / "corridors.json").read_text())["pairs"]
 ANON_COUNTERPARTY = "Anonymous counterparty"
 
 
@@ -185,7 +189,7 @@ def _float(v) -> float:
         return math.nan
 
 
-def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> APIRouter:
+def build_router(svc: OrderService, accounts: AccountService, kick_worker, cashouts: Optional[CashoutService] = None) -> APIRouter:
     r = APIRouter(prefix="/api")
 
     def account_of(req: Request):
@@ -382,6 +386,56 @@ def build_router(svc: OrderService, accounts: AccountService, kick_worker) -> AP
         })
         # The counterparty is someone else: the caller only sees it anonymized.
         return {"order": one(req, order), "batches": [serialize_batch(m) for m in matches]}
+
+    # ------------------------------------------------- anchor cash-out (SEP-1 / SEP-10 / SEP-24)
+
+    @r.get("/anchor")
+    async def anchor_info():
+        """The connected anchor: name, network, supported SEPs and USDC cash-out limits (from its stellar.toml)."""
+        return await anchor.summary()
+
+    @r.get("/accounts/me/wallet")
+    async def my_wallet(req: Request):
+        """USDC held by this account's hidden wallet (received payouts not yet cashed out)."""
+        a = require_account(req)
+        return {"publicKey": a["wallet_public"], "usdc": float(format_units(await chain.usdc_balance(a["wallet_public"])))}
+
+    @r.get("/accounts/me/cashouts")
+    async def my_cashouts(req: Request):
+        a = require_account(req)
+        return [cashout_view(c) for c in cashouts.list_for(a["id"])]
+
+    @r.post("/accounts/me/cashouts")
+    async def start_cashout(req: Request):
+        """Start a SEP-24 cash-out: returns the anchor's own form URL for the user to complete."""
+        a = require_account(req)
+        c = await cashouts.start(a, str((await _body(req)).get("amount") or ""))
+        return cashout_view(c)
+
+    @r.post("/demo/incoming")
+    async def demo_incoming(req: Request):
+        """Demo: someone abroad (a sandbox account in a country paired with yours) sends you money through Tandem
+        with a 15-second window. Whatever doesn't match arrives in your wallet as USDC, ready to cash out."""
+        a = require_account(req)
+        b = await _body(req)
+        partners = [p["b"] if p["a"] == a["country"] else p["a"] for p in _PAIRS if a["country"] in (p["a"], p["b"])]
+        if not partners:
+            raise HttpError(400, f"{a['country']} has no country pair.")
+        frm = partners[0]
+        svc.expire_sandbox_orders([frm, a["country"]])  # leftovers from demos can't match it first
+        sender = await accounts.demo_account(frm)
+        order, _ = svc.place_for_account(sender, {
+            "senderName": sender["display_name"],
+            "recipientName": a["display_name"],
+            "recipientAddress": a["wallet_public"],
+            "fromCountry": frm,
+            "toCountry": a["country"],
+            "amount": str(b.get("amount") or "5"),
+            "deadlineMinutes": 0.25,
+            "remainderPolicy": "direct_stellar_fallback",
+            "notes": "Demo incoming transfer.",
+        })
+        return {"order": serialize_received(order, svc.fills_for(order["id"]))}
 
     @r.post("/demo/clear")
     async def demo_clear(req: Request):

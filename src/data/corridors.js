@@ -21,3 +21,6 @@ export const partnersOf = (name) => data.pairs.flatMap((p) => (p.a === name ? [p
 
 /** App country name -> the name the fee spreadsheets use (e.g. "European Union" -> "Eurozone"). */
 export const SHEET_NAME = Object.fromEntries(Object.entries(data.countries).map(([name, c]) => [name, c.sheetName]));
+
+/** Country name -> two-letter code (the station tag shown on routes), e.g. "Philippines" -> "PH". */
+export const CODES = Object.fromEntries(Object.entries(data.countries).map(([name, c]) => [name, c.code]));

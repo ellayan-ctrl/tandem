@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T00:00:00Z",
+  "title": "Design System: Tandem",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Enamel Ink", "canonical": "#0f2233", "tonalRamp": ["#08141f", "#0f2233", "#1b2b37", "#2b3a45", "#3c4c57", "#5f717d", "#b4c1c8", "#e8edef"] },
+      "ground": { "role": "neutral", "displayName": "Concourse", "canonical": "#f4f6f5", "tonalRamp": ["#2b3a45", "#4e5f6a", "#b4c1c8", "#d5dde1", "#e8edef", "#f4f6f5", "#f9faf9", "#ffffff"] },
+      "panel": { "role": "neutral", "displayName": "Panel White", "canonical": "#ffffff" },
+      "local": { "role": "secondary", "displayName": "Platform Green", "canonical": "#2f8a5b", "tonalRamp": ["#113825", "#174a30", "#1d5e3c", "#24744b", "#2f8a5b", "#74bc93", "#d2ebdd", "#e9f5ee"] },
+      "local-text": { "role": "secondary", "displayName": "Platform Green Deep", "canonical": "#1d5e3c" },
+      "local-tint": { "role": "secondary", "displayName": "Platform Green Tint", "canonical": "#e9f5ee" },
+      "cross": { "role": "secondary", "displayName": "Crossing Blue", "canonical": "#3a6ea5", "tonalRamp": ["#172c43", "#1e3a58", "#26496e", "#2f5b89", "#3a6ea5", "#7fa5d0", "#d5e2f0", "#ebf1f8"] },
+      "cross-text": { "role": "secondary", "displayName": "Crossing Blue Deep", "canonical": "#26496e" },
+      "cross-tint": { "role": "secondary", "displayName": "Crossing Blue Tint", "canonical": "#ebf1f8" },
+      "signal": { "role": "tertiary", "displayName": "Departure Amber", "canonical": "#c98a12", "tonalRamp": ["#4a320c", "#62420c", "#7c540b", "#9c6a0b", "#c98a12", "#e2b04e", "#f6e6c2", "#fbf4e4"] },
+      "signal-text": { "role": "tertiary", "displayName": "Departure Amber Deep", "canonical": "#62420c" },
+      "signal-tint": { "role": "tertiary", "displayName": "Departure Amber Tint", "canonical": "#fbf4e4" },
+      "failure": { "role": "tertiary", "displayName": "Failure Red", "canonical": "#a8392d", "tonalRamp": ["#521d18", "#6e2620", "#8a2e25", "#a8392d", "#bf4538", "#df8579", "#f6d9d5", "#fbeeec"] },
+      "failure-text": { "role": "tertiary", "displayName": "Failure Red Deep", "canonical": "#8a2e25" },
+      "failure-tint": { "role": "tertiary", "displayName": "Failure Red Tint", "canonical": "#fbeeec" },
+      "wash": { "role": "neutral", "displayName": "Wash", "canonical": "#f4f6f7" },
+      "hatch-ground": { "role": "neutral", "displayName": "Hatch Ground", "canonical": "#e8edef" },
+      "divider": { "role": "neutral", "displayName": "Divider", "canonical": "#d5dde1" },
+      "control-rule": { "role": "neutral", "displayName": "Control Rule", "canonical": "#b4c1c8" },
+      "placeholder": { "role": "neutral", "displayName": "Placeholder", "canonical": "#5f717d" },
+      "label-grey": { "role": "neutral", "displayName": "Label Grey", "canonical": "#4e5f6a" },
+      "secondary-text": { "role": "neutral", "displayName": "Secondary Text", "canonical": "#3c4c57" },
+      "ink-hover": { "role": "primary", "displayName": "Ink Hover", "canonical": "#1b2b37" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The amount being sent and the receipt total. One per view." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles, 30 to 32px." },
+      "figure": { "displayName": "Figure", "purpose": "Matched and crossing split figures, in their line colour's text shade." },
+      "title": { "displayName": "Title", "purpose": "Panel headings." },
+      "body": { "displayName": "Body", "purpose": "Base text, fee lines, rows. Tabular figures." },
+      "body-small": { "displayName": "Body small", "purpose": "Supporting sentences and hints." },
+      "label": { "displayName": "Label", "purpose": "Uppercase field labels, column heads, station and TESTNET tags." },
+      "mono": { "displayName": "Mono", "purpose": "Order IDs, transaction hashes, Stellar addresses only." }
+    },
+    "shadows": [
+      { "name": "panel-edge", "value": "0 1px 2px rgb(15 34 51 / 0.06)", "purpose": "Softens the edge of every work panel." },
+      { "name": "sheet-lift", "value": "0 16px 48px rgb(15 34 51 / 0.35)", "purpose": "The receipt modal only, over a 55% ink scrim; removed in print." },
+      { "name": "field-focus", "value": "0 0 0 1px #0f2233", "purpose": "Ink ring added to a focused field alongside its ink border." },
+      { "name": "selected-underline", "value": "inset 0 -3px 0 #0f2233", "purpose": "Selected cell of a joined segmented control." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Route strip segments easing to a new split over 700ms; disabled under reduced motion." },
+      { "name": "control-state", "value": "120ms", "purpose": "Field border colour change." },
+      { "name": "disclose-rotate", "value": "150ms", "purpose": "Drawn chevron rotating 180 degrees when a disclosure opens." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Squared ink button for the main action of a view.",
+      "html": "<button class=\"ds-btn-primary\">Send a transfer</button>",
+      "css": ".ds-btn-primary { height: 44px; padding: 0 20px; border: 0; border-radius: 2px; background: #0f2233; color: #fff; font-family: Barlow, ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color 150ms; } .ds-btn-primary:hover { background: #1b2b37; } .ds-btn-primary:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; } .ds-btn-primary:disabled { background: #b4c1c8; color: #3c4c57; }"
+    },
+    {
+      "name": "Send Button",
+      "kind": "button",
+      "refersTo": "button-send",
+      "description": "The isolated irreversible action: full width at the foot of the route panel, consequence written beneath.",
+      "html": "<div class=\"ds-send\"><button class=\"ds-send-btn\">Send $10.00 <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button><p class=\"ds-send-note\">Nothing leaves your account before a match or departure at 22:24.</p></div>",
+      "css": ".ds-send { border-top: 1px solid #d5dde1; padding: 24px 20px 20px; background: #fff; font-family: Barlow, ui-sans-serif, sans-serif; } .ds-send-btn { width: 100%; height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 2px; background: #0f2233; color: #fff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer; transition: background-color 150ms; } .ds-send-btn:hover { background: #1b2b37; } .ds-send-btn:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; } .ds-send-note { margin: 10px 0 0; font-size: 14px; color: #3c4c57; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action with a 1px inset ink ring.",
+      "html": "<button class=\"ds-btn-outline\">Cash out with an anchor</button>",
+      "css": ".ds-btn-outline { height: 36px; padding: 0 14px; border: 0; border-radius: 2px; background: transparent; box-shadow: inset 0 0 0 1px #0f2233; color: #0f2233; font-family: Barlow, ui-sans-serif, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color 150ms; } .ds-btn-outline:hover { background: #fff; } .ds-btn-outline:focus-visible { outline: 2px solid #3a6ea5; outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Squared text field with a condensed uppercase label and an ink focus.",
+      "html": "<label class=\"ds-field-wrap\"><span class=\"ds-label\">Recipient in Kenya</span><input class=\"ds-field\" placeholder=\"Full name\" /></label>",
+      "css": ".ds-field-wrap { display: block; font-family: Barlow, ui-sans-serif, sans-serif; } .ds-label { display: block; font-family: 'Barlow Semi Condensed', Barlow, sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: #4e5f6a; } .ds-field { display: block; width: 100%; margin-top: 6px; background: #fff; border: 1px solid #b4c1c8; border-radius: 3px; padding: 9px 12px; font-family: inherit; font-size: 15px; color: #0f2233; transition: border-color 120ms; } .ds-field::placeholder { color: #5f717d; } .ds-field:hover { border-color: #5f717d; } .ds-field:focus { outline: none; border-color: #0f2233; box-shadow: 0 0 0 1px #0f2233; }"
+    },
+    {
+      "name": "Shell Navigation",
+      "kind": "nav",
+      "refersTo": "nav-shell",
+      "description": "Navy enamel bar; the active tab carries a 3px white rule on the bar's bottom edge; amber TESTNET tag.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-brand\">Tandem</span><a class=\"ds-nav-tab is-active\" href=\"#\">Send</a><a class=\"ds-nav-tab\" href=\"#\">Live orders</a><a class=\"ds-nav-tab\" href=\"#\">My transfers</a><span class=\"ds-nav-testnet\">TESTNET</span></nav>",
+      "css": ".ds-nav { display: flex; align-items: stretch; gap: 0; height: 60px; padding: 0 24px; background: #0f2233; color: #fff; font-family: Barlow, ui-sans-serif, sans-serif; } .ds-nav-brand { display: flex; align-items: center; margin-right: 24px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; } .ds-nav-tab { position: relative; display: inline-flex; align-items: center; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b4c1c8; text-decoration: none; transition: color 150ms; } .ds-nav-tab:hover, .ds-nav-tab.is-active { color: #fff; } .ds-nav-tab::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 3px; background: transparent; } .ds-nav-tab.is-active::after { background: #fff; } .ds-nav-tab:focus-visible { outline: 2px solid #3a6ea5; outline-offset: -2px; } .ds-nav-testnet { align-self: center; margin-left: auto; height: 28px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgb(214 155 39 / 0.6); color: #e2b04e; font-family: 'Barlow Semi Condensed', Barlow, sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 0.05em; }"
+    },
+    {
+      "name": "Station Tag and Status Chips",
+      "kind": "chip",
+      "refersTo": "station-tag",
+      "description": "Two-letter station codes for countries, and status chips tinted by the hue that owns the meaning.",
+      "html": "<div class=\"ds-chips\"><span class=\"ds-station\">AE</span><span class=\"ds-station ds-station-line\">PH</span><span class=\"ds-status ds-status-local\">Paid locally</span><span class=\"ds-status ds-status-cross\">Sent on Stellar</span><span class=\"ds-status ds-status-signal\">Waiting for a match</span><span class=\"ds-status ds-status-failure\">Payout failed</span></div>",
+      "css": ".ds-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: Barlow, ui-sans-serif, sans-serif; } .ds-station { display: inline-flex; align-items: center; justify-content: center; height: 24px; min-width: 32px; padding: 0 6px; border-radius: 2px; background: #0f2233; color: #fff; font-family: 'Barlow Semi Condensed', Barlow, sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.05em; } .ds-station-line { background: #fff; color: #0f2233; box-shadow: inset 0 0 0 1px #0f2233; } .ds-status { padding: 2px 8px; border-radius: 2px; font-size: 13px; font-weight: 600; white-space: nowrap; } .ds-status-local { background: #e9f5ee; color: #174a30; } .ds-status-cross { background: #ebf1f8; color: #1e3a58; } .ds-status-signal { background: #fbf4e4; color: #62420c; } .ds-status-failure { background: #fbeeec; color: #6e2620; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "White work panel capped by a 3px ink rule; regions split by 1px dividers.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-region\"><h3 class=\"ds-panel-title\">Payment and recipient</h3><p class=\"ds-panel-text\">Charged in CAD only when it matches.</p></div><dl class=\"ds-panel-region ds-fees\"><div><dt>Stellar network fee</dt><dd>~0.00002 XLM</dd></div><div class=\"ds-fees-total\"><dt>Estimated fees if sent now</dt><dd>$0.34</dd></div></dl></section>",
+      "css": ".ds-panel { background: #fff; border-top: 3px solid #0f2233; box-shadow: 0 1px 2px rgb(15 34 51 / 0.06); font-family: Barlow, ui-sans-serif, sans-serif; color: #0f2233; font-variant-numeric: tabular-nums; } .ds-panel-region { padding: 14px 20px; margin: 0; } .ds-panel-region + .ds-panel-region { border-top: 1px solid #d5dde1; } .ds-panel-title { margin: 0; font-size: 18px; font-weight: 600; } .ds-panel-text { margin: 4px 0 0; font-size: 14px; color: #3c4c57; } .ds-fees div { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; padding: 4px 0; } .ds-fees dt { color: #3c4c57; } .ds-fees dd { margin: 0; } .ds-fees-total { border-top: 1px solid #d5dde1; margin-top: 4px; padding-top: 8px !important; font-weight: 600; } .ds-fees-total dt { color: #0f2233; }"
+    },
+    {
+      "name": "Route Strip",
+      "kind": "custom",
+      "refersTo": "route-strip",
+      "description": "Signature: an amount drawn as a line between two station stops, split green (paid locally), hatched (waiting), blue (crosses on Stellar), with its key.",
+      "html": "<div class=\"ds-route\"><div class=\"ds-route-line\" role=\"img\" aria-label=\"UAE to Philippines: $40.00 paid locally, $15.00 still waiting, $45.00 across on Stellar\"><span class=\"ds-stop\"></span><span class=\"ds-bar\"><span class=\"ds-seg ds-seg-local\" style=\"flex-grow:0.4\"></span><span class=\"ds-seg ds-seg-wait\" style=\"flex-grow:0.15\"></span><span class=\"ds-seg ds-seg-cross\" style=\"flex-grow:0.45\"></span></span><span class=\"ds-stop\"></span></div><div class=\"ds-key\"><span><i class=\"ds-sw ds-seg-local\"></i>Paid locally</span><b>$40.00</b></div><div class=\"ds-key\"><span><i class=\"ds-sw ds-seg-wait\"></i>Still waiting</span><b>$15.00</b></div><div class=\"ds-key\"><span><i class=\"ds-sw ds-seg-cross\"></i>Across on Stellar</span><b>$45.00</b></div></div>",
+      "css": ".ds-route { font-family: Barlow, ui-sans-serif, sans-serif; font-size: 14px; color: #0f2233; font-variant-numeric: tabular-nums; } .ds-route-line { display: flex; align-items: center; gap: 6px; } .ds-stop { flex-shrink: 0; width: 14px; height: 14px; box-sizing: border-box; border: 3px solid #0f2233; border-radius: 9999px; background: #fff; } .ds-bar { flex: 1; display: flex; gap: 1px; height: 10px; border-radius: 1px; overflow: hidden; } .ds-seg { flex-basis: 0; transition: flex-grow 700ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-seg-local { background: #2f8a5b; } .ds-seg-cross { background: #3a6ea5; } .ds-seg-wait { background-color: #e8edef; background-image: repeating-linear-gradient(135deg, #b4c1c8 0 2px, transparent 2px 6px); } .ds-key { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; } .ds-key span { display: flex; align-items: center; gap: 8px; color: #3c4c57; } .ds-key b { font-weight: 400; } .ds-sw { display: inline-block; width: 10px; height: 10px; border-radius: 1px; } @media (prefers-reduced-motion: reduce) { .ds-seg { transition: none; } }"
+    },
+    {
+      "name": "Departures Row",
+      "kind": "custom",
+      "refersTo": "departure-cell",
+      "description": "Matching-window picker set as a timetable row of joined cells; the chosen departure fills ink.",
+      "html": "<div class=\"ds-dep\" role=\"radiogroup\" aria-label=\"Matching window\"><button class=\"ds-dep-cell\" role=\"radio\" aria-checked=\"false\"><b>15 min</b><span>21:39</span></button><button class=\"ds-dep-cell\" role=\"radio\" aria-checked=\"false\"><b>30 min</b><span>21:54</span></button><button class=\"ds-dep-cell\" role=\"radio\" aria-checked=\"true\"><b>1 hour</b><span>22:24</span></button><button class=\"ds-dep-cell\" role=\"radio\" aria-checked=\"false\"><b>6 hours</b><span>03:24</span></button></div>",
+      "css": ".ds-dep { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #b4c1c8; border-radius: 2px; overflow: hidden; font-family: Barlow, ui-sans-serif, sans-serif; font-variant-numeric: tabular-nums; } .ds-dep-cell { padding: 8px 10px; text-align: left; border: 0; border-right: 1px solid #b4c1c8; background: #fff; color: #0f2233; font-family: inherit; font-size: 15px; cursor: pointer; transition: background-color 150ms; } .ds-dep-cell:last-child { border-right: 0; } .ds-dep-cell b { display: block; font-weight: 600; } .ds-dep-cell span { display: block; font-size: 13px; color: #4e5f6a; } .ds-dep-cell:hover { background: #f4f6f7; } .ds-dep-cell[aria-checked='true'] { background: #0f2233; color: #fff; } .ds-dep-cell[aria-checked='true'] span { color: #b4c1c8; } .ds-dep-cell:focus-visible { outline: 2px solid #3a6ea5; outline-offset: -2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Corridor Timetable",
+    "overview": "Every corridor is a transit line with two directions and every transfer is a scheduled departure. The matched part stays on the platform and is paid locally; only the remainder boards and crosses the border on Stellar. The interface is set like a departures board and a route map: a navy enamel shell, a cool off-white concourse, white work panels capped with an ink rule, two line colours that each carry one meaning, and countries written as two-letter station codes.\n\nDensity is that of a timetable, not a dashboard: rows, rules and figures, read left to right, with numbers always tabular. Colour is scarce and functional. Grey exists only to rank text and draw rules; it never decorates. Depth is almost absent: panels sit flat on the ground and are separated by their ink caps and by white space, not by shadow.\n\nThe system rejects the slate card stack with rounded shadow cards and a black pill button. Its one authored motion is the route strip easing to a new split.",
+    "keyCharacteristics": [
+      "Navy ink shell and ink-capped white panels on a cool off-white ground.",
+      "Two line colours with fixed jobs: green is paid locally, blue crosses on Stellar.",
+      "Waiting money is hatched, never coloured.",
+      "Every routed amount is drawn as a route strip between two station stops.",
+      "Barlow for everything, Barlow Semi Condensed for uppercase labels and tags, tabular figures throughout.",
+      "Squared geometry: 2 to 4px corners, 1px rules, 3px ink accents."
+    ],
+    "rules": [
+      { "name": "The Two Lines Rule", "body": "Green means paid locally and blue means crosses on Stellar, everywhere, without exception. Neither is used as a generic accent, success colour or brand flourish.", "section": "colors" },
+      { "name": "The Hatch Rule", "body": "Money that is neither matched nor sent is drawn with the 135-degree hatch, never a colour, so waiting can never be misread as a state of the line.", "section": "colors" },
+      { "name": "The Red Is Failure Rule", "body": "Red appears only when something failed. Amber is the only warning hue and it means the window is closing or this is testnet.", "section": "colors" },
+      { "name": "The No Decorative Grey Rule", "body": "Neutrals rank text and draw rules. A grey fill, badge or icon tint that carries no meaning is not allowed.", "section": "colors" },
+      { "name": "The Tabular Figures Rule", "body": "body sets font-variant-numeric: tabular-nums; every amount, time and count lines up in columns. Figures are never set in monospace to look technical.", "section": "typography" },
+      { "name": "The Condensed Label Rule", "body": "Uppercase belongs only to the condensed label face. Headings and body copy stay in sentence case.", "section": "typography" },
+      { "name": "The Mono Is Evidence Rule", "body": "JetBrains Mono marks a machine identifier that someone might copy or verify on Stellar Expert. It is never decoration.", "section": "typography" },
+      { "name": "The Isolated Send Rule", "body": "The irreversible action stands alone at the foot of the route panel, full width, below a rule, with its consequence written underneath. Nothing else shares its row.", "section": "layout" },
+      { "name": "The One Baseline Rule", "body": "Progress stages sit on a single baseline: equal grid columns, stop marks on one line, connectors drawn between them.", "section": "layout" },
+      { "name": "The Ink Cap Rule", "body": "A work surface announces itself with a 3px ink top rule, not with a rounded corner or a shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do cap every work panel with the 3px ink rule and keep its corners square.",
+      "Do draw any amount that travels between two countries as a route strip, with its key.",
+      "Do keep green for paid locally and blue for crosses on Stellar on every surface, including status chips and figures.",
+      "Do hatch money that is still waiting.",
+      "Do write countries as two-letter station tags in the condensed face.",
+      "Do set uppercase only in Barlow Semi Condensed at 0.07em tracking.",
+      "Do keep the irreversible action alone, full width, with its consequence written beneath it.",
+      "Do put machine identifiers in JetBrains Mono and link them to Stellar Expert where they exist."
+    ],
+    "donts": [
+      "Don't use rounded shadow cards or a pill-shaped black button; this world is ruled panels and squared ink buttons.",
+      "Don't use green or blue as a generic success or brand accent; each already means one thing.",
+      "Don't use red for anything but failure, or amber for anything but a closing window or testnet.",
+      "Don't fill or tint with grey for decoration.",
+      "Don't show flag emoji for countries.",
+      "Don't set amounts in monospace, or set figures without tabular numerals.",
+      "Don't let the browser draw select arrows or disclosure markers; use the drawn ink chevron.",
+      "Don't add looping or ornamental motion; the route strip's split easing is the one authored movement."
+    ]
+  }
+}

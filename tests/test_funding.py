@@ -8,8 +8,12 @@ def test_valid_canadian_bank():
 
 def test_missing_and_invalid_fields():
     assert "required" in validate_selection("Canada", {"providerId": "ca-rbc", "details": {}})
-    bad = {"providerId": "ca-rbc", "details": {"payerName": "Jane Doe", "transit": "12", "institution": "003", "accountNumber": "1234567"}}
-    assert "looks invalid" in validate_selection("Canada", bad)
+    # Bank numbers take any non-empty text (testing demos); names are still checked.
+    anything = {"providerId": "ca-rbc", "details": {"payerName": "Jane Doe", "transit": "12", "institution": "x", "accountNumber": "test"}}
+    assert validate_selection("Canada", anything) is None
+    assert validate_selection("United Arab Emirates", {"providerId": "ae-enbd", "details": {"payerName": "Jane Doe", "iban": "anything"}}) is None
+    bad_name = {"providerId": "ca-rbc", "details": {"payerName": "J", "transit": "12", "institution": "x", "accountNumber": "test"}}
+    assert "looks invalid" in validate_selection("Canada", bad_name)
     assert "not available" in validate_selection("Kenya", {"providerId": "ca-rbc", "details": {}})
     assert validate_selection("Canada", None) == "Choose how you will pay in the matched amount."
 

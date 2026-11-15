@@ -89,6 +89,27 @@ export const OVERSEAS_FEES = {
     sourceUrl: 'https://wise.com/us/wishes/',
     note: 'Wise 0.49% + USD 7.02',
   },
+  'AED-PHP': {
+    // Wise does not yet offer AED -> PHP to UAE senders (wise.com/ae), so the cheapest retail app is used.
+    provider: 'TapTap Send',
+    fundingMethod: 'Debit card to bank deposit / GCash',
+    pct: 0.74,
+    flat: 0,
+    sample1000: 7.4,
+    bankMarkup: [3.0, 5.0],
+    sourceUrl: 'https://moneytransfers.com/en-ae/send-money/philippines',
+    note: 'TapTap Send AED 0 fee + 0.74% below mid-market (10 Nov 2026); Regency FX 0.27% on AED 25,000',
+  },
+  'PHP-AED': {
+    provider: 'Wise',
+    fundingMethod: 'PH bank transfer / InstaPay',
+    pct: 0.3,
+    flat: 116.32,
+    sample1000: 119.32,
+    bankMarkup: null, // Philippine banks publish no outward FX markup
+    sourceUrl: 'https://wise.com/gb/compare/?sourceCurrency=PHP&targetCurrency=AED&sendAmount=15000',
+    note: 'Wise ~0.30% + PHP 116.32 at the mid-market rate (PHP 161.17 on PHP 15,000, 15 Nov 2026)',
+  },
 };
 
 /** Domestic rail by origin currency (same across every row with that origin). */
@@ -103,6 +124,21 @@ export const DOMESTIC_RAILS = {
     cap: 108,
     freeUpTo: 1000,
     sourceUrl: 'https://familybank.co.ke/?ways-to-bank=pesalink-direct-transfers',
+  },
+  AED: {
+    rail: 'Aani instant payment (UAE)',
+    pct: 0,
+    flat: 0,
+    cap: 0.5,
+    sourceUrl: 'https://abk.eahli.com/ar/documents/521/Aani_FAQ.pdf',
+  },
+  PHP: {
+    rail: 'InstaPay / PESONet',
+    pct: 0,
+    flat: 0,
+    cap: 10,
+    sourceUrl:
+      'https://www.gmanetwork.com/news/money/companies/994461/list-banks-e-wallets-with-zero-or-reduced-transfer-fees-as-of-july-2026/story/',
   },
 };
 

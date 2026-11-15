@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-11-15T02:28:56.323Z",
+        "reason": "Unchosen decision-round sketch drawn in another direction's fonts by design; not shipped UI"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-slide-rack.html"
+        ],
+        "createdAt": "2026-11-15T02:28:56.335Z",
+        "reason": "Unchosen decision-round sketch drawn in another direction's fonts by design; not shipped UI"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-15T02:28:56.348Z",
+        "reason": "Unchosen decision-round sketch drawn in another direction's fonts by design; not shipped UI"
+      }
+    ]
+  }
+}

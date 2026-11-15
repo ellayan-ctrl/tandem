@@ -16,6 +16,7 @@ const SRC = {
   mpesa: 'https://businesstoday.co.ke/m-pesa-charges-2026-withdrawal-and-send-money-fees/',
   pesalink: 'https://techtrendske.co.ke/2026/08/18/ncba-cuts-pesalink-fees-joins-19-other-banks-in-flat-kes-20-pricing/',
   moneygramDomestic: 'https://www.gobankingrates.com/saving-money/shopping/moneygram-fee/',
+  phInstapay: 'https://mb.com.ph/2026/07/05/gcash-slashes-bank-transfer-fee-to-10',
 };
 
 /** Specific providers (by funding provider id). */
@@ -52,6 +53,20 @@ const BY_PROVIDER = {
     basis: 'assumption',
     sourceUrl: SRC.mpesa,
     note: 'Assumed to track M-Pesa tariffs',
+  },
+  'ph-gcash': {
+    flat: 10,
+    pct: 0,
+    basis: 'sourced',
+    sourceUrl: SRC.phInstapay,
+    note: 'GCash InstaPay bank transfer: PHP 10 (cut from PHP 15, July 2026); GCash-to-GCash is free',
+  },
+  'ph-maya': {
+    flat: 10,
+    pct: 0,
+    basis: 'sourced',
+    sourceUrl: SRC.phInstapay,
+    note: 'Maya InstaPay transfer: PHP 10 (July 2026); Maya-to-Maya and PESONet are free',
   },
 };
 

@@ -2,6 +2,7 @@
   "$comment": "World Bank Remittance Prices Worldwide averages (% all-in), keyed \"From->To\"; used when no live quotes exist.",
   "pct": {
     "Canada->Kenya": 7.28,
+    "United Arab Emirates->Philippines": 3.04,
     "default": 6.49
   }
 }

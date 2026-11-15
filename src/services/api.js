@@ -53,6 +53,13 @@ export const api = {
   // What this account sent and received (each row has direction: 'sent' | 'received').
   myTransactions: () => call('/accounts/me/transactions'),
 
+  // ---- cash out through a real anchor (SEP-1 / SEP-10 / SEP-24)
+  anchorInfo: () => call('/anchor'),
+  myWallet: () => call('/accounts/me/wallet'),
+  myCashouts: () => call('/accounts/me/cashouts'),
+  startCashout: (amount) => call('/accounts/me/cashouts', { body: { amount } }),
+  demoIncoming: (amount) => call('/demo/incoming', { body: { amount } }),
+
   // ---- cash in / cash out services (live from the Stellar Scout partner directory)
   ramps: (country) => call(country ? `/ramps?country=${encodeURIComponent(country)}` : '/ramps'),
 

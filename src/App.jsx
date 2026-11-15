@@ -315,11 +315,15 @@ export default function App() {
   const activeOrdersCount = orders.filter((o) => o.status === 'open' || o.status === 'partially_matched').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors selection:bg-slate-900 selection:text-white">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-ground text-ink flex flex-col font-sans">
+      {/* Toast */}
       {toastNotification && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 border border-slate-700 dark:border-slate-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-md z-50 bg-ink text-white pl-3.5 pr-4 py-3 rounded-sm shadow-[0_8px_24px_rgb(15_34_51/0.28)] text-sm flex items-start gap-2.5"
+        >
+          <Check className="w-4 h-4 mt-0.5 text-emerald-300 shrink-0" aria-hidden="true" />
           <span>{toastNotification}</span>
         </div>
       )}
@@ -342,6 +346,7 @@ export default function App() {
           <SendTransferForm
             corridors={CORRIDORS}
             account={account}
+            orders={orders}
             onLinkBank={(kind) => openAccountModal(true, kind ?? null)}
             onOrderCreated={handleOrderCreated}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
@@ -435,14 +440,17 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-6 mt-12 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-2 text-xs text-slate-500">
-          <span className="font-semibold text-slate-800 dark:text-slate-200">Tandem</span>
-          <span>© {new Date().getFullYear()} Tandem. All rights reserved.</span>
-          <span>·</span>
-          <button onClick={() => setTourOpen(true)} className="hover:underline text-slate-600 dark:text-slate-400">
-            Interactive Tour
-          </button>
+      <footer className="border-t border-slate-200 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-sm text-slate-600">
+          <span>
+            <span className="font-semibold text-ink">Tandem</span> · Send together, save together.
+          </span>
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>Stellar testnet{latestLedger ? ` · ledger ${latestLedger.toLocaleString('en-US')}` : ''}</span>
+            <button onClick={() => setTourOpen(true)} className="font-medium text-ink hover:underline">
+              How Tandem works
+            </button>
+          </span>
         </div>
       </footer>
     </div>

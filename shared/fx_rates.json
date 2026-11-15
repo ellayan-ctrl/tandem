@@ -31,6 +31,11 @@
       "symbol": "₱",
       "name": "Philippine Peso"
     },
+    "AED": {
+      "rate": 3.6725,
+      "symbol": "AED",
+      "name": "UAE Dirham"
+    },
     "ARS": {
       "rate": 1050,
       "symbol": "AR$",

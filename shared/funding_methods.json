@@ -1,11 +1,12 @@
 {
-  "$comment": "How a sender can pay in the MATCHED amount, by sender country. Read by the Python server (validation, masking, funding records) and the JS front end (forms). Simulated rails in this testnet demo.",
+  "$comment": "How a sender can pay in the MATCHED amount, by sender country. Read by the Python server (validation, masking, funding records) and the JS front end (forms). Simulated rails in this testnet demo. Bank-number fields (account number, IBAN, routing, transit, institution, CBU/CVU) take any non-empty text so testing demos can type anything.",
   "linkedBankId": "linked-bank",
   "currencyByCountry": {
     "Canada": "CAD",
     "Kenya": "KES",
     "Nigeria": "NGN",
     "Philippines": "PHP",
+    "United Arab Emirates": "AED",
     "United States": "USD",
     "European Union": "EUR",
     "Argentina": "ARS"
@@ -69,20 +70,17 @@
           {
             "key": "transit",
             "label": "Transit number",
-            "placeholder": "5 digits",
-            "pattern": "[0-9]{5}"
+            "placeholder": "5 digits"
           },
           {
             "key": "institution",
             "label": "Institution number",
-            "placeholder": "3 digits",
-            "pattern": "[0-9]{3}"
+            "placeholder": "3 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "7–12 digits",
-            "pattern": "[0-9]{7,12}",
             "sensitive": true
           }
         ]
@@ -102,20 +100,17 @@
           {
             "key": "transit",
             "label": "Transit number",
-            "placeholder": "5 digits",
-            "pattern": "[0-9]{5}"
+            "placeholder": "5 digits"
           },
           {
             "key": "institution",
             "label": "Institution number",
-            "placeholder": "3 digits",
-            "pattern": "[0-9]{3}"
+            "placeholder": "3 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "7–12 digits",
-            "pattern": "[0-9]{7,12}",
             "sensitive": true
           }
         ]
@@ -135,20 +130,17 @@
           {
             "key": "transit",
             "label": "Transit number",
-            "placeholder": "5 digits",
-            "pattern": "[0-9]{5}"
+            "placeholder": "5 digits"
           },
           {
             "key": "institution",
             "label": "Institution number",
-            "placeholder": "3 digits",
-            "pattern": "[0-9]{3}"
+            "placeholder": "3 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "7–12 digits",
-            "pattern": "[0-9]{7,12}",
             "sensitive": true
           }
         ]
@@ -168,20 +160,17 @@
           {
             "key": "transit",
             "label": "Transit number",
-            "placeholder": "5 digits",
-            "pattern": "[0-9]{5}"
+            "placeholder": "5 digits"
           },
           {
             "key": "institution",
             "label": "Institution number",
-            "placeholder": "3 digits",
-            "pattern": "[0-9]{3}"
+            "placeholder": "3 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "7–12 digits",
-            "pattern": "[0-9]{7,12}",
             "sensitive": true
           }
         ]
@@ -201,20 +190,17 @@
           {
             "key": "transit",
             "label": "Transit number",
-            "placeholder": "5 digits",
-            "pattern": "[0-9]{5}"
+            "placeholder": "5 digits"
           },
           {
             "key": "institution",
             "label": "Institution number",
-            "placeholder": "3 digits",
-            "pattern": "[0-9]{3}"
+            "placeholder": "3 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "7–12 digits",
-            "pattern": "[0-9]{7,12}",
             "sensitive": true
           }
         ]
@@ -240,20 +226,17 @@
           {
             "key": "transit",
             "label": "Transit number",
-            "placeholder": "5 digits",
-            "pattern": "[0-9]{5}"
+            "placeholder": "5 digits"
           },
           {
             "key": "institution",
             "label": "Institution number",
-            "placeholder": "3 digits",
-            "pattern": "[0-9]{3}"
+            "placeholder": "3 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "7–12 digits",
-            "pattern": "[0-9]{7,12}",
             "sensitive": true
           }
         ]
@@ -399,7 +382,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "8–16 digits",
-            "pattern": "[0-9]{8,16}",
             "sensitive": true
           }
         ]
@@ -420,7 +402,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "8–16 digits",
-            "pattern": "[0-9]{8,16}",
             "sensitive": true
           }
         ]
@@ -441,7 +422,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "8–16 digits",
-            "pattern": "[0-9]{8,16}",
             "sensitive": true
           }
         ]
@@ -468,7 +448,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "8–16 digits",
-            "pattern": "[0-9]{8,16}",
             "sensitive": true
           }
         ]
@@ -593,7 +572,6 @@
             "key": "accountNumber",
             "label": "NUBAN account number",
             "placeholder": "10 digits",
-            "pattern": "[0-9]{10}",
             "sensitive": true
           }
         ]
@@ -614,7 +592,6 @@
             "key": "accountNumber",
             "label": "NUBAN account number",
             "placeholder": "10 digits",
-            "pattern": "[0-9]{10}",
             "sensitive": true
           }
         ]
@@ -635,7 +612,6 @@
             "key": "accountNumber",
             "label": "NUBAN account number",
             "placeholder": "10 digits",
-            "pattern": "[0-9]{10}",
             "sensitive": true
           }
         ]
@@ -656,7 +632,6 @@
             "key": "accountNumber",
             "label": "NUBAN account number",
             "placeholder": "10 digits",
-            "pattern": "[0-9]{10}",
             "sensitive": true
           }
         ]
@@ -683,7 +658,6 @@
             "key": "accountNumber",
             "label": "NUBAN account number",
             "placeholder": "10 digits",
-            "pattern": "[0-9]{10}",
             "sensitive": true
           }
         ]
@@ -788,7 +762,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "10–16 digits",
-            "pattern": "[0-9]{10,16}",
             "sensitive": true
           }
         ]
@@ -809,7 +782,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "10–16 digits",
-            "pattern": "[0-9]{10,16}",
             "sensitive": true
           }
         ]
@@ -836,7 +808,6 @@
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "10–16 digits",
-            "pattern": "[0-9]{10,16}",
             "sensitive": true
           }
         ]
@@ -882,6 +853,169 @@
         ]
       }
     ],
+    "United Arab Emirates": [
+      {
+        "id": "ae-aani",
+        "name": "Aani instant payment",
+        "kind": "instant_transfer",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "contact",
+            "label": "Your Aani-registered mobile",
+            "placeholder": "+971 50 123 4567",
+            "pattern": "\\+?[0-9 ]{9,16}",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ae-debit",
+        "name": "Debit card (Visa / Mastercard)",
+        "kind": "debit_card",
+        "eta": "Instant",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Cardholder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "cardLast4",
+            "label": "Card last 4 digits",
+            "placeholder": "1234",
+            "pattern": "[0-9]{4}"
+          }
+        ]
+      },
+      {
+        "id": "ae-enbd",
+        "name": "Emirates NBD",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "iban",
+            "label": "IBAN",
+            "placeholder": "AE07 0331 2345 6789 0123 456",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ae-fab",
+        "name": "First Abu Dhabi Bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "iban",
+            "label": "IBAN",
+            "placeholder": "AE07 0331 2345 6789 0123 456",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ae-adcb",
+        "name": "ADCB",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "iban",
+            "label": "IBAN",
+            "placeholder": "AE07 0331 2345 6789 0123 456",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ae-other-bank",
+        "name": "Other UAE bank",
+        "kind": "bank_account",
+        "eta": "Same / next business day",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Account holder name",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "iban",
+            "label": "IBAN",
+            "placeholder": "AE07 0331 2345 6789 0123 456",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "ae-alansari",
+        "name": "Al Ansari Exchange branch",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on Emirates ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "Emirate or city you’ll pay in",
+            "placeholder": "e.g. Dubai",
+            "pattern": ".{2,60}"
+          }
+        ]
+      },
+      {
+        "id": "ae-lulu",
+        "name": "LuLu Exchange branch",
+        "kind": "cash_deposit",
+        "eta": "When you drop off the cash",
+        "fields": [
+          {
+            "key": "payerName",
+            "label": "Your full legal name (as on Emirates ID)",
+            "placeholder": "As on your ID / account",
+            "pattern": "[A-Za-zÀ-ÿ' .-]{3,80}"
+          },
+          {
+            "key": "city",
+            "label": "Emirate or city you’ll pay in",
+            "placeholder": "e.g. Dubai",
+            "pattern": ".{2,60}"
+          }
+        ]
+      }
+    ],
     "United States": [
       {
         "id": "us-debit",
@@ -918,14 +1052,12 @@
           {
             "key": "routing",
             "label": "ABA routing number",
-            "placeholder": "9 digits",
-            "pattern": "[0-9]{9}"
+            "placeholder": "9 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "4–17 digits",
-            "pattern": "[0-9]{4,17}",
             "sensitive": true
           }
         ]
@@ -945,14 +1077,12 @@
           {
             "key": "routing",
             "label": "ABA routing number",
-            "placeholder": "9 digits",
-            "pattern": "[0-9]{9}"
+            "placeholder": "9 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "4–17 digits",
-            "pattern": "[0-9]{4,17}",
             "sensitive": true
           }
         ]
@@ -972,14 +1102,12 @@
           {
             "key": "routing",
             "label": "ABA routing number",
-            "placeholder": "9 digits",
-            "pattern": "[0-9]{9}"
+            "placeholder": "9 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "4–17 digits",
-            "pattern": "[0-9]{4,17}",
             "sensitive": true
           }
         ]
@@ -1005,14 +1133,12 @@
           {
             "key": "routing",
             "label": "ABA routing number",
-            "placeholder": "9 digits",
-            "pattern": "[0-9]{9}"
+            "placeholder": "9 digits"
           },
           {
             "key": "accountNumber",
             "label": "Account number",
             "placeholder": "4–17 digits",
-            "pattern": "[0-9]{4,17}",
             "sensitive": true
           }
         ]
@@ -1101,7 +1227,6 @@
             "key": "iban",
             "label": "IBAN",
             "placeholder": "e.g. DE89 3704 0044 0532 0130 00",
-            "pattern": "[A-Z]{2}[0-9]{2}[A-Z0-9 ]{11,32}",
             "sensitive": true
           }
         ]
@@ -1138,7 +1263,6 @@
             "key": "cvu",
             "label": "Your CVU or alias",
             "placeholder": "22-digit CVU or alias",
-            "pattern": "([0-9]{22}|[A-Za-z0-9.-]{6,20})",
             "sensitive": true
           },
           {
@@ -1185,7 +1309,6 @@
             "key": "cbu",
             "label": "CBU / CVU",
             "placeholder": "22 digits",
-            "pattern": "[0-9]{22}",
             "sensitive": true
           }
         ]
@@ -1206,7 +1329,6 @@
             "key": "cbu",
             "label": "CBU / CVU",
             "placeholder": "22 digits",
-            "pattern": "[0-9]{22}",
             "sensitive": true
           }
         ]
@@ -1233,7 +1355,6 @@
             "key": "cbu",
             "label": "CBU / CVU",
             "placeholder": "22 digits",
-            "pattern": "[0-9]{22}",
             "sensitive": true
           }
         ]

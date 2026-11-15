@@ -54,18 +54,19 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
   const unmatchedPct = ONRAMP_PCT + OFFRAMP_PCT + MOBILE_CASHOUT_PCT;
   const fmtFlat = (v) => money(from.currency, v).replace(/\.00$/, '');
 
-  const bankMarkup = row
+  // Some corridors have no published bank FX markup (e.g. PHP -> AED); bankMarkup is null there.
+  const bankMarkup = row?.bankMarkup
     ? row.bankMarkup[0] === row.bankMarkup[1]
       ? `${row.bankMarkup[0].toFixed(2)}%`
       : `${row.bankMarkup[0].toFixed(2)}%–${row.bankMarkup[1].toFixed(2)}%`
     : null;
   const pts = overseasPct != null ? Math.abs(overseasPct - domPct).toFixed(2) : null;
   const sortedQuotes = overseas ? [...overseas.quotes].sort((a, b) => a.totalCost - b.totalCost) : [];
-  const detailLink = 'text-slate-500 hover:underline inline-flex items-center gap-0.5';
-  const sectionTitle = 'text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1';
+  const detailLink = 'text-cross hover:underline inline-flex items-center gap-0.5';
+  const sectionTitle = 'label mb-1';
   const basisBadge = (basis) => (
     <span
-      className={`px-1 rounded text-[9px] font-semibold uppercase ${
+      className={`ml-1 px-1 rounded-xs text-[11px] font-semibold uppercase tracking-wide ${
         basis === 'sourced'
           ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
           : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
@@ -76,29 +77,32 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
   );
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden text-xs">
-      <div className="px-3 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
-        <span className="font-semibold text-slate-900 dark:text-white">Cost to transfer the matched amount</span>
-        <span className="block text-[11px] text-slate-500">Rates only. They apply just to the part that matches.</span>
+    <section className="panel text-sm" aria-labelledby="rates-h">
+      <div className="px-5 py-4 border-b border-slate-200">
+        <h2 id="rates-h" className="text-lg font-semibold">What the matched part costs</h2>
+        <span className="block text-slate-600">Rates for the part that matches, paid locally instead of sent abroad.</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2">
-        <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20">
-          <span className="text-[11px] text-slate-500 block truncate">Domestic · {method.name}</span>
-          <span className="text-base font-bold text-slate-900 dark:text-white">{dom.label}</span>
+        <div className="px-4 py-3 border-b sm:border-b-0 sm:border-r border-slate-200">
+          <span className="flex items-center gap-2 text-slate-600 truncate">
+            <span className="w-2.5 h-2.5 rounded-[1px] bg-local shrink-0" aria-hidden="true" />
+            Locally · {method.name}
+          </span>
+          <span className="block mt-0.5 text-lg font-semibold">{dom.label}</span>
         </div>
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/40">
-          <span className="text-[11px] text-slate-500 block">Overseas instead · cheapest</span>
+        <div className="px-4 py-3">
+          <span className="block text-slate-600">Sent abroad instead, cheapest</span>
           {row ? (
-            <span className="text-base font-bold text-slate-900 dark:text-white">
+            <span className="block mt-0.5 text-lg font-semibold">
               {row.pct}%{row.flat > 0 ? ` + ${fmtFlat(row.flat)}` : ', no flat fee'}
             </span>
           ) : loading && !overseas ? (
             <span className="text-[11px] text-slate-400">Fetching live rates…</span>
           ) : cheapest ? (
-            <span className="text-base font-bold text-slate-900 dark:text-white">{quoteRate(cheapest, from.currency)}</span>
+            <span className="block mt-0.5 text-lg font-semibold">{quoteRate(cheapest, from.currency)}</span>
           ) : overseas?.averagePct != null ? (
-            <span className="text-base font-bold text-slate-900 dark:text-white">~{overseas.averagePct}% all-in</span>
+            <span className="block mt-0.5 text-lg font-semibold">~{overseas.averagePct}% all-in</span>
           ) : (
             <span className="text-[11px] text-slate-400">No price data available.</span>
           )}
@@ -106,9 +110,9 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
       </div>
 
       {pts != null && (
-        <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-200">
-          Domestic is about{' '}
-          <strong className="font-mono-numbers">
+        <div className="px-4 py-2.5 border-t border-slate-200">
+          Paying locally is about{' '}
+          <strong className="font-semibold">
             {pts} percentage points {overseasPct >= domPct ? 'less expensive' : 'more expensive'}
           </strong>{' '}
           than overseas.
@@ -120,14 +124,14 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
           type="button"
           onClick={() => setShowDetails(!showDetails)}
           aria-expanded={showDetails}
-          className="w-full px-3 py-2 text-[11px] text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1"
+          className="w-full px-4 py-2.5 text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium"
         >
-          <ChevronDown className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
-          {showDetails ? 'Hide details & sources' : 'Details, sources & all Wise quotes'}
+          <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
+          {showDetails ? 'Hide sources' : 'Sources and every quote we compared'}
         </button>
 
         {showDetails && (
-          <div className="px-3 pb-3 space-y-3 text-[11px] text-slate-600 dark:text-slate-300">
+          <div className="px-4 pb-4 space-y-4 text-slate-700">
             <div>
               <div className={sectionTitle}>Domestic: {method.name}</div>
               <div>
@@ -151,7 +155,7 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
                   <li>
                     Verified quote: {money(from.currency, row.sample1000)} on {fmtFlat(1000)} ({(row.sample1000 / 10).toFixed(2)}% all-in).
                   </li>
-                  <li>Traditional banks: {bankMarkup} FX markup.</li>
+                  {bankMarkup && <li>Traditional banks: {bankMarkup} FX markup.</li>}
                   <li className="text-slate-500">{row.note}</li>
                   <li>
                     <a href={row.sourceUrl} target="_blank" rel="noreferrer" className={detailLink}>
@@ -220,7 +224,7 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
                   Live quotes from {sortedQuotes.length} banks &amp; transfer providers for {fmtFlat(overseas.amount)}
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[11px] font-mono-numbers">
+                  <table className="w-full text-sm">
                     <thead>
                       <tr className="text-slate-500 text-left">
                         <th className="py-1 pr-2 font-normal">Provider</th>
@@ -259,6 +263,6 @@ export const SavingsComparison = ({ from, to, localAmount, method }) => {
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 };

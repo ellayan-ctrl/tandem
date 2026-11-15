@@ -76,6 +76,15 @@ Click **View on Stellar Expert** (or paste the tx hash into the search box at ht
 
 Place another Canada → Kenya order, then in **Live Orders** click **Simulate onward order (chain)**. Someone in Kenya now sends to Nigeria: your recipient in Kenya is paid locally, and that part of your money becomes one routed **Canada → Nigeria** transfer (shown in My Transactions as *routed via Kenya*). It keeps the earlier of the two deadlines and settles the same way.
 
+### Cash out through a real anchor (SEP-24)
+
+**My Transactions → Cash out with an anchor** connects to the Stellar Development Foundation's reference anchor on Testnet (`testanchor.stellar.org`). It reads the anchor's `stellar.toml` (SEP-1) and signs in as your wallet (SEP-10), then cashes out by SEP-24.
+
+1. If your wallet holds no USDC, click **Receive a $5 test transfer**. Someone in a paired country sends you $5 through Tandem with a 15-second window. Nothing matches it, so after the timer the contract pays you 5 USDC (about 30 seconds).
+2. Enter an amount (the anchor allows 1–10 USDC) and click **Cash out**. The anchor's own form opens in a popup. Fill it in; Tandem never sees these details.
+3. Tandem then sends the USDC to the anchor with the memo the anchor asked for, and follows the anchor until it reports **Completed**. The test anchor keeps a 10% fee and simulates the bank payout.
+4. Open **USDC to anchor on Stellar Expert**: one payment of exactly your amount, with the anchor's memo.
+
 ### Cash in & cash out
 
 The bottom of **My Transactions** lists services that convert between local money and USDC on Stellar, for your account's country (switch countries with the selector). The list comes live from the public Stellar Scout partner directory, the same data the Raven MCP server serves. Services are ranked: based in that country first, then the region, then worldwide. For MoneyGram, **locations near me** opens a map of nearby cash points. If the directory is unreachable, the app shows a dated offline copy and says so. The app's own USDC is testnet USDC and cannot be cashed out.

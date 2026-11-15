@@ -13,6 +13,7 @@ from .accounts import AccountService
 from .api import build_router, install_error_handlers
 from .config import ROOT, config
 from .db import open_db
+from .cashouts import CashoutService
 from .orders import OrderService
 from .worker import ExpiryWorker
 
@@ -24,7 +25,8 @@ def create_app(serve_frontend: bool = False) -> FastAPI:
     db = open_db(config.db_path)
     accounts = AccountService(db)
     svc = OrderService(db, accounts)
-    worker = ExpiryWorker(svc, config.worker_interval_s)
+    cashouts = CashoutService(db, accounts)
+    worker = ExpiryWorker(svc, config.worker_interval_s, cashouts)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -40,7 +42,7 @@ def create_app(serve_frontend: bool = False) -> FastAPI:
 
     app = FastAPI(title="TwoWay Stellar", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     install_error_handlers(app)
-    app.include_router(build_router(svc, accounts, worker.kick))
+    app.include_router(build_router(svc, accounts, worker.kick, cashouts))
 
     if serve_frontend:
         dist = ROOT / "dist"

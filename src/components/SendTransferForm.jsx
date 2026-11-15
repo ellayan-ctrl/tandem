@@ -1,34 +1,32 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight } from 'lucide-react';
 
+import { MOBILE_CASHOUT_PCT, OFFRAMP_PCT, ONRAMP_PCT } from '../data/costModel';
+import { domesticRate } from '../data/domesticFees';
 import { domesticFee, overseasFee } from '../data/feeSheet';
 import { sheetRow } from '../data/sheets';
 import { api } from '../services/api';
 import { FX_RATES } from '../services/bankingService';
 import { isValidStellarPublicKey } from '../services/stellarTestnet';
 import { MethodSelect } from './MethodSelect';
+import { RouteStrip, Station, usd } from './Route';
 import { SavingsComparison } from './SavingsComparison';
 
 /** Longest and shortest matching windows the server accepts (7 days, 15 seconds). */
 const MAX_WINDOW_MINUTES = 7 * 24 * 60;
 const MIN_WINDOW_MINUTES = 0.25;
-/** Slider stops, in minutes: fine-grained for short windows, coarser for long ones. */
-const WINDOW_STOPS = [
-  0.25, 0.5, 0.75, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 960, 1440, 2160, 2880, 4320, 5760, 7200,
-  8640, 10080,
-];
 const WINDOW_PRESETS = [
-  { label: '15s', minutes: 0.25 },
-  { label: '30s', minutes: 0.5 },
-  { label: '15m', minutes: 15 },
-  { label: '30m', minutes: 30 },
-  { label: '1h', minutes: 60 },
-  { label: '6h', minutes: 360 },
-  { label: '24h', minutes: 1440 },
+  { label: '15 s', minutes: 0.25 },
+  { label: '30 s', minutes: 0.5 },
+  { label: '15 min', minutes: 15 },
+  { label: '30 min', minutes: 30 },
+  { label: '1 hour', minutes: 60 },
+  { label: '6 hours', minutes: 360 },
+  { label: '24 hours', minutes: 1440 },
 ];
-/** Index of the slider stop closest to `minutes` (so presets and exact values move the slider too). */
-const nearestStop = (minutes) =>
-  WINDOW_STOPS.reduce((best, m, i) => (Math.abs(m - minutes) < Math.abs(WINDOW_STOPS[best] - minutes) ? i : best), 0);
+/** Cost of the unmatched part: on-ramp to USDC, off-ramp, recipient cash-out (src/data/costModel.js). */
+const CROSS_PCT = ONRAMP_PCT + OFFRAMP_PCT + MOBILE_CASHOUT_PCT;
+
 /** 0.5 -> "30 s", 45 -> "45 min", 90 -> "1 h 30 min", 2160 -> "1 day 12 h" */
 const formatWindow = (minutes) => {
   const total = Math.round(minutes * 60);
@@ -39,44 +37,54 @@ const formatWindow = (minutes) => {
   const parts = [d && `${d} day${d > 1 ? 's' : ''}`, h && `${h} h`, m && `${m} min`, s && `${s} s`].filter(Boolean);
   return parts.join(' ') || '0 min';
 };
+/** Clock time a window opened now would close: "21:11", "21:11:30" under a minute, "Sun 21:11" past a day. */
+const departs = (minutes, now) => {
+  const d = new Date(now + minutes * 60 * 1000);
+  const t = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+  if (minutes < 1) return d.toLocaleTimeString([], { ...t, second: '2-digit' });
+  if (minutes >= 1440) return `${d.toLocaleDateString([], { weekday: 'short' })} ${d.toLocaleTimeString([], t)}`;
+  return d.toLocaleTimeString([], t);
+};
+const localMoney = (currency, v) => `${currency} ${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const OPEN = ['open', 'partially_matched'];
 
-export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreated, onNavigateToDashboard }) => {
+export const SendTransferForm = ({ corridors, account, orders = [], onLinkBank, onOrderCreated, onNavigateToDashboard }) => {
   const [selectedCorridorId, setSelectedCorridorId] = useState('CA-KE');
   const [directionReversed, setDirectionReversed] = useState(false);
   const [amount, setAmount] = useState('10');
   const [recipientName, setRecipientName] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
-
-  // Mode: Matched corridor pool vs instant direct
+  // Match first (timed pool) vs send now (everything crosses on Stellar immediately).
   const [transferMode, setTransferMode] = useState('matched_pool');
-
-  // Deadline selection
   // Matching window length in minutes (15 s .. 7 days, the server's limit; 0.5 = 30 seconds).
   const [windowMinutes, setWindowMinutes] = useState(60);
-  // What's typed in the "Exact" box; follows the slider and presets.
   const [windowInput, setWindowInput] = useState('60');
   useEffect(() => setWindowInput(String(+windowMinutes.toFixed(2))), [windowMinutes]);
+  // Clock for the departure times; ticks so "departs 21:11" stays true while the form is open.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, []);
 
   // Unmatched remainder always settles in USDC on Soroban.
   const remainderPolicy = 'direct_stellar_fallback';
-
-  // Linked bank that pays the matched part, and (optionally) a different one for the unmatched part.
+  // Linked method that pays the matched part, and (optionally) a different one for the unmatched part.
   const [bankId, setBankId] = useState(null);
   const [remainderBankId, setRemainderBankId] = useState(null);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedOrder, setSubmittedOrder] = useState(null);
-
   const [formError, setFormError] = useState(null);
 
   const activeCorridor = corridors.find((c) => c.id === selectedCorridorId) || corridors[0];
-
   const fromCountry = directionReversed ? activeCorridor.countryB : activeCorridor.countryA;
   const toCountry = directionReversed ? activeCorridor.countryA : activeCorridor.countryB;
+  const isMatching = transferMode === 'matched_pool';
 
   // Amount is entered in USD; the bank is charged in the sender's local currency.
   const fxRate = FX_RATES[fromCountry.currency]?.rate ?? 1;
-  const localNeeded = (parseFloat(amount) || 0) * fxRate;
+  const parsedAmount = parseFloat(amount) || 0;
+  const localNeeded = parsedAmount * fxRate;
 
   // Send from the linked bank's country when the corridor includes it.
   useEffect(() => {
@@ -95,27 +103,35 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
 
   /** Pays the matched part. */
   const payBank = account?.banks.find((b) => b.id === bankId);
-  /** "Send from": funds the unmatched part (converted to USDC), or everything for a Full Crypto Transfer. */
+  /** Funds the unmatched part (converted to USDC), or everything when sending now. */
   const remainderBank = account?.banks.find((b) => b.id === remainderBankId);
+  const effectiveMinutes = isMatching ? windowMinutes : 0;
+  const departureTime = departs(effectiveMinutes, now);
 
-  const parsedAmount = parseFloat(amount) || 0;
-  const effectiveMinutes =
-    transferMode === 'direct_instant' ? 0 : windowMinutes;
+  // What is waiting to go the other way on this corridor right now (oldest orders fill first, so
+  // same-direction orders already queued are ahead of this one).
+  const openVolume = (from, to) =>
+    orders
+      .filter((o) => o.fromCountry === from && o.toCountry === to && OPEN.includes(o.status) && o.transferType !== 'direct_instant')
+      .reduce((s, o) => s + (o.remainingAmount ?? 0), 0);
+  const oppositeWaiting = openVolume(toCountry.name, fromCountry.name);
+  const aheadOfYou = openVolume(fromCountry.name, toCountry.name);
+  const matchNow = isMatching ? Math.min(parsedAmount, Math.max(0, oppositeWaiting - aheadOfYou)) : 0;
+  const crossIfUnmatched = Math.max(0, parsedAmount - matchNow);
 
-  const expiryDate = new Date(Date.now() + effectiveMinutes * 60 * 1000);
-  const formattedExpiryTime = expiryDate.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  // If the whole amount matched: the spreadsheet's overseas-provider fee minus its domestic-rail fee
-  // for this direction (both in the sender's currency, converted to USD).
+  // Fees, in USD, for the split above.
   const feeRow = sheetRow(fromCountry.name, toCountry.name);
-  const senderFx = FX_RATES[fromCountry.currency]?.rate;
-  const matchSavings =
-    feeRow && senderFx && parsedAmount > 0
-      ? Math.max(0, overseasFee(feeRow, parsedAmount * senderFx) - domesticFee(feeRow, parsedAmount * senderFx).high) / senderFx
-      : null;
+  const matchedFee =
+    matchNow <= 0
+      ? 0
+      : payBank
+        ? domesticRate(fromCountry.name, payBank.providerId, fromCountry.currency).maxFee(matchNow * fxRate) / fxRate
+        : feeRow
+          ? domesticFee(feeRow, matchNow * fxRate).high / fxRate
+          : null;
+  const crossFee = (crossIfUnmatched * CROSS_PCT) / 100;
+  const totalFee = (matchedFee ?? 0) + crossFee;
+  const overseasCost = feeRow && parsedAmount > 0 ? overseasFee(feeRow, localNeeded) / fxRate : null;
 
   // "Use testnet demo address": the sandbox account in the destination country (it holds a USDC trustline).
   const [demoAddressLoading, setDemoAddressLoading] = useState(false);
@@ -138,450 +154,474 @@ export const SendTransferForm = ({ corridors, account, onLinkBank, onOrderCreate
     if (parsedAmount <= 0) return;
     if (!account) {
       onLinkBank();
-      setFormError('Link your bank account first.');
+      setFormError('Link a bank account first. It only takes a moment and nothing real is connected.');
       return;
     }
     if (fromCountry.name !== account.country) {
-      setFormError(`Your linked bank is in ${account.country}. Choose countries that send from ${account.country}.`);
+      setFormError(`Your bank is in ${account.country}. Pick a route that starts in ${account.country}, or use the swap button.`);
       return;
     }
     if (localNeeded > account.available + 0.005) {
       setFormError(
-        `Not enough in your bank: ${account.currency} ${account.available.toFixed(2)} available, ${account.currency} ${localNeeded.toFixed(2)} needed.`,
+        `Not enough in your account: ${localMoney(account.currency, account.available)} available, ${localMoney(account.currency, localNeeded)} needed.`,
       );
       return;
     }
-
     const cleanRecipient = recipientAddress.trim();
     if (!isValidStellarPublicKey(cleanRecipient)) {
-      setFormError('Invalid Stellar recipient address. Must be a valid 56-character Ed25519 public key starting with G.');
+      setFormError('That recipient address is not valid. It should be 56 characters and start with G.');
       return;
     }
-
-    if (!remainderBank || (transferMode === 'matched_pool' && !payBank)) {
-      setFormError('Choose which linked account to send from, or link one first.');
+    if (!remainderBank || (isMatching && !payBank)) {
+      setFormError('Choose which linked account to pay from, or link one first.');
       return;
     }
-    for (const b of new Set(transferMode === 'matched_pool' ? [payBank, remainderBank] : [remainderBank])) {
+    for (const b of new Set(isMatching ? [payBank, remainderBank] : [remainderBank])) {
       if (b && localNeeded > b.available + 0.005) {
-        setFormError(
-          `Not enough in ${b.name}: ${account.currency} ${b.available.toFixed(2)} available, ${account.currency} ${localNeeded.toFixed(2)} needed.`,
-        );
+        setFormError(`Not enough in ${b.name}: ${localMoney(account.currency, b.available)} available, ${localMoney(account.currency, localNeeded)} needed.`);
         return;
       }
     }
 
     setIsSubmitting(true);
-
-    {
-      const isInstant = transferMode === 'direct_instant';
-      const newOrder = {
-        id: `ORD-${Date.now().toString().slice(-6)}`,
-        senderName: 'You',
-        senderAddress: account.wallet.publicKey,
-        recipientName: recipientName.trim() || 'Recipient',
-        recipientAddress: cleanRecipient,
-        fromCountry: fromCountry.name,
-        toCountry: toCountry.name,
-        fromFlag: fromCountry.flag,
-        toFlag: toCountry.flag,
-        amount: parsedAmount,
-        matchedAmount: isInstant ? parsedAmount : 0,
-        remainingAmount: isInstant ? 0 : parsedAmount,
-        status: isInstant ? 'settled' : 'open',
-        createdAt: Date.now(),
-        deadlineMinutes: effectiveMinutes,
-        deadlineTimestamp: isInstant ? Date.now() : Date.now() + effectiveMinutes * 60 * 1000,
-        remainderPolicy,
-        transferType: transferMode,
-        bankId: isInstant ? remainderBank?.id : payBank?.id,
-        remainderBankId: remainderBank?.id,
-        matchHistory: [],
-        escrowContractId: '',
-        depositTxHash: '',
-        notes: isInstant
-          ? `Direct transfer to ${toCountry.name}`
-          : `Transfer ${fromCountry.name} to ${toCountry.name} (${effectiveMinutes}m window)`,
-      };
-
-      let saved;
-      try {
-        saved = await onOrderCreated(newOrder);
-      } catch (err) {
-        setFormError(err.message || 'Could not place the order.');
-        setIsSubmitting(false);
-        return;
-      }
-      setSubmittedOrder(saved);
+    const isInstant = !isMatching;
+    const newOrder = {
+      id: `ORD-${Date.now().toString().slice(-6)}`,
+      senderName: 'You',
+      senderAddress: account.wallet.publicKey,
+      recipientName: recipientName.trim() || 'Recipient',
+      recipientAddress: cleanRecipient,
+      fromCountry: fromCountry.name,
+      toCountry: toCountry.name,
+      fromFlag: fromCountry.flag,
+      toFlag: toCountry.flag,
+      amount: parsedAmount,
+      matchedAmount: isInstant ? parsedAmount : 0,
+      remainingAmount: isInstant ? 0 : parsedAmount,
+      status: isInstant ? 'settled' : 'open',
+      createdAt: Date.now(),
+      deadlineMinutes: effectiveMinutes,
+      deadlineTimestamp: isInstant ? Date.now() : Date.now() + effectiveMinutes * 60 * 1000,
+      remainderPolicy,
+      transferType: transferMode,
+      bankId: isInstant ? remainderBank?.id : payBank?.id,
+      remainderBankId: remainderBank?.id,
+      matchHistory: [],
+      escrowContractId: '',
+      depositTxHash: '',
+      notes: isInstant ? `Direct transfer to ${toCountry.name}` : `Transfer ${fromCountry.name} to ${toCountry.name} (${effectiveMinutes}m window)`,
+    };
+    let saved;
+    try {
+      saved = await onOrderCreated(newOrder);
+    } catch (err) {
+      setFormError(err.message || 'Could not place the transfer.');
       setIsSubmitting(false);
-      // Auto-redirect to Live Orders as requested
-      setTimeout(() => {
-        onNavigateToDashboard();
-      }, 400);
+      return;
     }
+    setSubmittedOrder(saved);
+    setIsSubmitting(false);
+    setTimeout(() => onNavigateToDashboard(), 400);
   };
 
+  // From/To pickers: every country in a pair, and the countries paired with the sender's.
+  const pickFrom = (name) => {
+    const c = corridors.find((p) => p.countryA.name === name || p.countryB.name === name);
+    if (!c) return;
+    const keepTo = corridors.find(
+      (p) => (p.countryA.name === name && p.countryB.name === toCountry.name) || (p.countryB.name === name && p.countryA.name === toCountry.name),
+    );
+    const next = keepTo ?? c;
+    setSelectedCorridorId(next.id);
+    setDirectionReversed(next.countryB.name === name);
+  };
+  const pickTo = (name) => {
+    const c = corridors.find(
+      (p) => (p.countryA.name === fromCountry.name && p.countryB.name === name) || (p.countryB.name === fromCountry.name && p.countryA.name === name),
+    );
+    if (!c) return;
+    setSelectedCorridorId(c.id);
+    setDirectionReversed(c.countryB.name === fromCountry.name);
+  };
+  const allCountries = [...new Set(corridors.flatMap((c) => [c.countryA.name, c.countryB.name]))];
+  const partners = corridors.flatMap((c) =>
+    c.countryA.name === fromCountry.name ? [c.countryB.name] : c.countryB.name === fromCountry.name ? [c.countryA.name] : [],
+  );
+  const stationSelect = 'chevron bg-transparent font-semibold text-lg leading-tight cursor-pointer rounded-xs hover:text-cross';
+
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6">
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Send Money</h1>
-        <p className="mt-1 text-xs text-slate-500">Match opposite-direction transfers on Stellar to reduce recipient cash-out costs.</p>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16">
+      <div className="mb-5 max-w-2xl">
+        <h1 className="text-[30px] leading-tight font-semibold tracking-[-0.01em]">Send money</h1>
+        <p className="mt-1 text-slate-600 text-base">Matched money is paid locally on both sides. Only what&apos;s left crosses the border.</p>
       </div>
 
-      {/* Success Notification */}
       {submittedOrder && (
-        <div className="mb-6 p-4 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="font-semibold text-slate-900 dark:text-white block">
-                {submittedOrder.transferType === 'direct_instant' ? 'Transfer Submitted' : 'Order Placed in Matching Queue'}
-              </span>
-              <p className="text-slate-600 dark:text-slate-400 mt-0.5">
-                ${submittedOrder.amount.toFixed(2)} USDC to {submittedOrder.recipientName} ({submittedOrder.toCountry}) · Order{' '}
-                {submittedOrder.id}
-              </p>
-            </div>
-            <button
-              onClick={onNavigateToDashboard}
-              className="text-slate-900 dark:text-white font-semibold underline hover:no-underline ml-4"
-            >
-              View in Live Orders
-            </button>
+        <div role="status" className="mb-6 panel px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold">
+              {submittedOrder.transferType === 'direct_instant' ? 'Transfer sent' : 'Transfer placed, looking for a match'}
+            </p>
+            <p className="text-sm text-slate-600">
+              {usd(submittedOrder.amount)} to {submittedOrder.recipientName} in {submittedOrder.toCountry} · {submittedOrder.id}
+            </p>
           </div>
+          <button onClick={onNavigateToDashboard} className="text-sm font-semibold underline hover:no-underline">
+            View in Live orders
+          </button>
         </div>
       )}
 
-      {/* Main Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Method Segmented Control */}
-        <div data-tour="transfer-mode" className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
-          <button
-            type="button"
-            onClick={() => setTransferMode('matched_pool')}
-            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors text-center ${
-              transferMode === 'matched_pool'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
-          >
-            Transfer Matching (Timed)
-          </button>
-          <button
-            type="button"
-            onClick={() => setTransferMode('direct_instant')}
-            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors text-center ${
-              transferMode === 'direct_instant'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
-          >
-            Full Crypto Transfer (Immediate)
-          </button>
-        </div>
+      <form onSubmit={handleSubmit} className="grid lg:grid-cols-[minmax(0,1fr)_400px] gap-6 lg:gap-8 items-start">
+        <div className="space-y-4 min-w-0">
+          {/* Match first vs send now: the same ink-selected grammar as the departures row */}
+          <div data-tour="transfer-mode" role="radiogroup" aria-label="How to send" className="grid grid-cols-2 bg-white ring-1 ring-inset ring-slate-300 rounded-sm overflow-hidden">
+            {[
+              ['matched_pool', 'Match first', 'Cheaper. Waits for a match until it departs.'],
+              ['direct_instant', 'Send now', 'Everything crosses on Stellar right away.'],
+            ].map(([id, title, note], i) => {
+              const on = transferMode === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setTransferMode(id)}
+                  className={`text-left px-4 py-2 transition-colors ${i === 0 ? 'border-r border-slate-300' : ''} ${
+                    on ? 'shadow-[inset_0_-3px_0_var(--color-ink)]' : 'text-slate-600 hover:bg-slate-50 hover:text-ink'
+                  }`}
+                >
+                  <span className="block font-semibold">{title}</span>
+                  <span className="block text-sm text-slate-600">{note}</span>
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Currency & Corridor Box */}
-        <div
-          data-tour="corridor-route"
-          className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4 bg-white dark:bg-slate-800/60"
-        >
-          {/* Corridor Selection */}
-          <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-700">
-            <div>
-              <span className="text-[11px] text-slate-500 block">Countries</span>
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
-                <span>
-                  {fromCountry.flag} {fromCountry.name}
-                </span>
-                <span className="text-slate-400">→</span>
-                <span>
-                  {toCountry.flag} {toCountry.name}
-                </span>
+          {/* Route (the station pair is the picker) and amount */}
+          <section data-tour="corridor-route" className="panel" aria-label="Route and amount">
+            <div className="flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center gap-3 px-5 py-3.5">
+              <div className="min-w-0">
+                <span className="label">From</span>
+                <div className="mt-1.5 flex items-center gap-2.5">
+                  <Station country={fromCountry.name} size="lg" />
+                  <div className="min-w-0">
+                    <select aria-label="Send from" value={fromCountry.name} onChange={(e) => pickFrom(e.target.value)} className={`${stationSelect} max-w-full`}>
+                      {allCountries.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="text-sm text-slate-600">Pays in {fromCountry.currency}</div>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedCorridorId}
-                onChange={(e) => setSelectedCorridorId(e.target.value)}
-                className="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 font-medium"
-              >
-                {corridors.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.countryA.name} ⇄ {c.countryB.name}
-                  </option>
-                ))}
-              </select>
-
               <button
                 type="button"
                 onClick={() => setDirectionReversed(!directionReversed)}
-                className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                title="Swap sending and receiving country"
+                className="self-start sm:self-center w-10 h-10 inline-flex items-center justify-center rounded-sm ring-1 ring-inset ring-slate-300 hover:ring-ink hover:bg-slate-50 transition-colors max-sm:rotate-90"
+                title="Swap direction"
+                aria-label={`Swap direction: send from ${toCountry.name} to ${fromCountry.name} instead`}
               >
-                Reverse
+                <ArrowLeftRight className="w-4 h-4" />
+              </button>
+              <div className="min-w-0 sm:text-right">
+                <span className="label">To</span>
+                <div className="mt-1.5 flex items-center sm:justify-end gap-2.5 max-sm:flex-row-reverse max-sm:justify-end">
+                  <div className="min-w-0">
+                    <select aria-label="Send to" value={toCountry.name} onChange={(e) => pickTo(e.target.value)} className={`${stationSelect} max-w-full sm:text-right`}>
+                      {partners.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="text-sm text-slate-600">Received in {toCountry.currency}</div>
+                  </div>
+                  <Station country={toCountry.name} size="lg" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 px-5 pt-3.5 pb-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <label htmlFor="amount" className="label">
+                  You send
+                </label>
+                <span className="text-sm text-slate-600">
+                  {account ? (
+                    <>
+                      Available{payBank ? ` in ${payBank.name}` : ''}:{' '}
+                      <strong className="font-semibold text-ink">{localMoney(account.currency, payBank?.available ?? account.available)}</strong>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => onLinkBank()} className="underline font-medium text-ink">
+                      Link a payment method
+                    </button>
+                  )}
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-3 border-b-2 border-ink focus-within:border-cross transition-colors">
+                <span className="text-3xl font-semibold text-slate-500" aria-hidden="true">
+                  $
+                </span>
+                <input
+                  id="amount"
+                  type="number"
+                  min="1"
+                  step="any"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="no-spin flex-1 min-w-0 bg-transparent py-0.5 text-[40px] leading-none font-semibold tracking-[-0.02em] focus:outline-none"
+                  required
+                />
+                <span className="text-right leading-tight">
+                  <span className="block font-[family-name:var(--font-label)] font-semibold tracking-wider text-slate-500">USD</span>
+                  {fromCountry.currency !== 'USD' && localNeeded > 0 && (
+                    <span className="block text-sm text-slate-600 whitespace-nowrap">≈ {localMoney(fromCountry.currency, localNeeded)}</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Who pays, and who receives */}
+          <section data-tour="payout-method" className="panel px-5 py-3.5 space-y-3" aria-labelledby="pay-h">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="pay-h" className="text-lg font-semibold">
+                Payment and recipient
+              </h2>
+              <button
+                type="button"
+                onClick={fillDemoAddress}
+                disabled={demoAddressLoading}
+                className="text-sm font-medium text-cross hover:underline disabled:opacity-60"
+                title={`Fill in the sandbox account in ${toCountry.name}; it can receive test USDC`}
+              >
+                {demoAddressLoading ? 'Preparing address…' : 'Use a testnet demo recipient'}
               </button>
             </div>
-          </div>
-
-          {/* Amount */}
-          <div>
-            <div className="flex justify-between items-baseline mb-1">
-              <label className="text-[11px] font-medium text-slate-500">You send</label>
-              <span className="text-[11px] text-slate-400">
-                {account ? (
-                  <>
-                    Available{payBank ? ` in ${payBank.name}` : ''}:{' '}
-                    <strong className="font-mono-numbers text-slate-700 dark:text-slate-300">
-                      {account.currency} {(payBank?.available ?? account.available).toFixed(2)}
-                    </strong>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => onLinkBank()} className="underline">
-                    Link a payment method
-                  </button>
-                )}
-              </span>
-            </div>
-
-            <div className="relative">
-              <input
-                type="number"
-                min="1"
-                step="any"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full text-xl font-bold font-mono-numbers bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-slate-400"
-                required
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">USD</span>
-            </div>
-            {fromCountry.currency !== 'USD' && localNeeded > 0 && (
-              <span className="text-[11px] text-slate-500 block mt-1 font-mono-numbers">
-                ≈ {fromCountry.currency} {localNeeded.toFixed(2)} from your account
-              </span>
-            )}
-
-            <div className="mt-3">
+            <div className={`grid gap-4 ${isMatching ? 'sm:grid-cols-2' : ''}`}>
+              {isMatching && (
+                <MethodSelect
+                  label="Matched part from"
+                  account={account}
+                  value={payBank?.id ?? null}
+                  onChange={setBankId}
+                  onLinkAnother={() => onLinkBank()}
+                  hint={`Charged in ${fromCountry.currency} only when it matches.`}
+                />
+              )}
               <MethodSelect
-                label="Send from"
+                label={isMatching ? 'Anything unmatched from' : 'Pay from'}
                 account={account}
                 value={remainderBank?.id ?? null}
                 onChange={setRemainderBankId}
                 onLinkAnother={() => onLinkBank()}
-                hint={
-                  transferMode === 'matched_pool'
-                    ? 'Only the unmatched part is taken from here, converted to USDC when your window closes.'
-                    : 'The whole amount is taken from here and sent as USDC via Stellar Blockchain.'
-                }
+                hint={isMatching ? `Sent as USDC at ${departureTime}.` : 'Sent as USDC on Stellar now.'}
               />
             </div>
-          </div>
-        </div>
-
-        {/* Recipient Details */}
-        <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3 bg-white dark:bg-slate-800/60 text-xs">
-          <div className="flex justify-between items-baseline">
-            <span className="font-semibold text-slate-900 dark:text-white">Recipient in {toCountry.name}</span>
-            <button
-              type="button"
-              onClick={fillDemoAddress}
-              disabled={demoAddressLoading}
-              className="text-[11px] text-slate-500 hover:underline disabled:opacity-60"
-              title={`Fill the sandbox account in ${toCountry.name} (it holds a USDC trustline)`}
-            >
-              {demoAddressLoading ? 'Preparing address…' : 'Use testnet demo address'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] text-slate-500 block mb-1">Full Name</label>
-              <input
-                type="text"
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="Recipient Name"
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-[11px] text-slate-500 block mb-1">Stellar Address</label>
-              <input
-                type="text"
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value)}
-                placeholder="G..."
-                className="w-full px-2.5 py-1.5 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white focus:outline-none"
-                required
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Matching Window (only when in matching mode) */}
-        {transferMode === 'matched_pool' && (
-          <div
-            data-tour="matching-window"
-            className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3 bg-white dark:bg-slate-800/60 text-xs"
-          >
-            <div className="flex justify-between items-baseline">
-              <label className="font-semibold text-slate-900 dark:text-white">Matching Window</label>
-              <span className="text-slate-500 font-mono-numbers">
-                {formatWindow(windowMinutes)} · closes at {formattedExpiryTime}
-              </span>
-            </div>
-
-            {/* Slider: graduated stops so short and long windows are both easy to pick */}
-            <div className="space-y-1">
-              <input
-                type="range"
-                min={0}
-                max={WINDOW_STOPS.length - 1}
-                step={1}
-                value={nearestStop(windowMinutes)}
-                onChange={(e) => setWindowMinutes(WINDOW_STOPS[Number(e.target.value)])}
-                aria-label="Matching window length"
-                aria-valuetext={formatWindow(windowMinutes)}
-                className="w-full accent-slate-900 dark:accent-white cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono-numbers">
-                <span>15 s</span>
-                <span>1 h</span>
-                <span>6 h</span>
-                <span>1 day</span>
-                <span>7 days</span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              {WINDOW_PRESETS.map((item) => {
-                const isSelected = windowMinutes === item.minutes;
-                return (
-                  <button
-                    key={item.minutes}
-                    type="button"
-                    onClick={() => setWindowMinutes(item.minutes)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                      isSelected
-                        ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-              <label className="flex items-center gap-1.5 ml-auto text-slate-500">
-                Exact:
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              <label className="block">
+                <span className="label">Recipient in {toCountry.name}</span>
                 <input
-                  type="number"
-                  min={MIN_WINDOW_MINUTES}
-                  max={MAX_WINDOW_MINUTES}
-                  step="0.25"
-                  value={windowInput}
-                  onChange={(e) => {
-                    // Minutes, decimals allowed (0.5 = 30 seconds). Clamped on blur so typing "0.5" works.
-                    setWindowInput(e.target.value);
-                    const v = parseFloat(e.target.value);
-                    if (Number.isFinite(v) && v >= MIN_WINDOW_MINUTES && v <= MAX_WINDOW_MINUTES) setWindowMinutes(Math.round(v * 60) / 60);
-                  }}
-                  onBlur={() => {
-                    const v = parseFloat(windowInput);
-                    const clamped = Number.isFinite(v) ? Math.min(MAX_WINDOW_MINUTES, Math.max(MIN_WINDOW_MINUTES, v)) : windowMinutes;
-                    setWindowMinutes(Math.round(clamped * 60) / 60);
-                    setWindowInput(String(+(Math.round(clamped * 60) / 60).toFixed(2)));
-                  }}
-                  className="w-20 px-2 py-1 text-xs font-mono font-medium border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900"
+                  type="text"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="Full name"
+                  autoComplete="off"
+                  className="field mt-1.5"
+                  required
                 />
-                min
+              </label>
+              <label className="block">
+                <span className="label">Their Stellar address</span>
+                <input
+                  type="text"
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value)}
+                  placeholder="G…"
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="field mt-1.5 !font-mono !text-sm"
+                  required
+                />
               </label>
             </div>
-            <p className="text-[11px] text-slate-500">
-              Longer windows give more time to find a match (cheaper); shorter ones send the unmatched part sooner.
-            </p>
+          </section>
 
-            {/* Unmatched remainder: always USDC via Soroban */}
-            <div data-tour="remainder-policy" className="pt-3 border-t border-slate-100 dark:border-slate-700">
-              <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20">
-                <span className="font-semibold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  Unmatched amount: USDC via Stellar Blockchain
+          {/* Departure: the matching window as a timetable row */}
+          {isMatching && (
+            <section data-tour="matching-window" className="panel px-5 py-3.5 space-y-3" aria-labelledby="dep-h">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 id="dep-h" className="text-lg font-semibold">
+                  Departs in
+                </h2>
+                <span className="text-sm text-slate-600">
+                  {formatWindow(windowMinutes)} · at <strong className="font-semibold text-ink">{departureTime}</strong>
                 </span>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Whatever isn&apos;t matched when the window closes is converted to USDC and sent to {recipientName || 'the recipient'}
-                  &apos;s Stellar wallet by the TwoWay settlement contract. Nothing is taken from your account until then.
-                </p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* How the matched part is paid (matching mode only) */}
-        {transferMode === 'matched_pool' && (
-          <div
-            data-tour="payout-method"
-            className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-white dark:bg-slate-800/60 text-xs"
-          >
-            <MethodSelect
-              label="Pay for the matched amount with"
-              account={account}
-              value={payBank?.id ?? null}
-              onChange={setBankId}
-              onLinkAnother={() => onLinkBank()}
-              hint={`The part that matches is paid domestically in ${fromCountry.currency}, only once it matches. The recipient collects it however they prefer.`}
-            />
-            {payBank && account?.country === fromCountry.name && (
-              <div className="mt-3">
-                <SavingsComparison from={fromCountry} to={toCountry} localAmount={localNeeded} method={payBank} />
+              <div role="radiogroup" aria-label="Matching window" className="grid grid-cols-4 sm:grid-cols-7 border border-slate-300 rounded-sm overflow-hidden">
+                {WINDOW_PRESETS.map((p) => {
+                  const on = windowMinutes === p.minutes;
+                  return (
+                    <button
+                      key={p.minutes}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setWindowMinutes(p.minutes)}
+                      className={`px-2.5 py-2 text-left border-slate-300 [&:not(:last-child)]:border-r max-sm:[&:nth-child(4)]:border-r-0 max-sm:[&:nth-child(n+5)]:border-t transition-colors ${
+                        on ? 'bg-ink text-white' : 'bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="block font-semibold">{p.label}</span>
+                      <span className={`block text-[13px] ${on ? 'text-slate-300' : 'text-slate-500'}`}>{departs(p.minutes, now)}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <p className="text-sm text-slate-600">A longer wait gives more time for a match, so more of your money stays local.</p>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  Or exactly
+                  <input
+                    type="number"
+                    min={MIN_WINDOW_MINUTES}
+                    max={MAX_WINDOW_MINUTES}
+                    step="0.25"
+                    value={windowInput}
+                    aria-label="Matching window in minutes"
+                    onChange={(e) => {
+                      // Minutes, decimals allowed (0.5 = 30 seconds). Clamped on blur so typing "0.5" works.
+                      setWindowInput(e.target.value);
+                      const v = parseFloat(e.target.value);
+                      if (Number.isFinite(v) && v >= MIN_WINDOW_MINUTES && v <= MAX_WINDOW_MINUTES) setWindowMinutes(Math.round(v * 60) / 60);
+                    }}
+                    onBlur={() => {
+                      const v = parseFloat(windowInput);
+                      const clamped = Number.isFinite(v) ? Math.min(MAX_WINDOW_MINUTES, Math.max(MIN_WINDOW_MINUTES, v)) : windowMinutes;
+                      setWindowMinutes(Math.round(clamped * 60) / 60);
+                      setWindowInput(String(+(Math.round(clamped * 60) / 60).toFixed(2)));
+                    }}
+                    className="field !w-24 !py-1.5 !text-sm"
+                  />
+                  min
+                </label>
+              </div>
+            </section>
+          )}
 
-        {/* Cost Summary Line Items */}
-        <div className="text-xs text-slate-500 space-y-1.5 px-1 font-mono-numbers">
-          <div className="flex justify-between">
-            <span>Stellar network fee:</span>
-            <span>~0.00002 XLM</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Platform matching fee:</span>
-            <span>$0.00</span>
-          </div>
-          {transferMode === 'matched_pool' && (
-            <div className="flex justify-between text-slate-800 dark:text-slate-200 font-sans font-medium">
-              <span>
-                If fully matched, saves vs {feeRow?.provider ?? 'an overseas provider'}
-                {feeRow ? ` (fee spreadsheet, ${feeRow.id})` : ''}:
-              </span>
-              <span className="font-mono-numbers">{matchSavings === null ? 'not in the spreadsheet' : `~$${matchSavings.toFixed(2)}`}</span>
-            </div>
+          {/* Rate comparison, its own panel (sources live behind its disclosure) */}
+          {isMatching && payBank && account?.country === fromCountry.name && (
+            <SavingsComparison from={fromCountry} to={toCountry} localAmount={localNeeded} method={payBank} />
           )}
         </div>
 
-        {/* Form Error Banner */}
-        {formError && (
-          <div className="text-xs text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded border border-rose-200 dark:border-rose-900">
-            {formError}
-          </div>
-        )}
+        {/* The route panel: live split, fees, the one irreversible action */}
+        <aside className="panel lg:sticky lg:top-[84px]" aria-labelledby="sum-h">
+          <div className="px-5 pt-4 pb-5">
+            <h2 id="sum-h" className="text-lg font-semibold">
+              Your route
+            </h2>
+            <div className="mt-4 flex items-center justify-between text-sm font-semibold">
+              <span className="flex items-center gap-2">
+                <Station country={fromCountry.name} size="sm" /> {fromCountry.name}
+              </span>
+              <span className="flex items-center gap-2">
+                {toCountry.name} <Station country={toCountry.name} size="sm" />
+              </span>
+            </div>
+            <RouteStrip from={fromCountry.name} to={toCountry.name} local={matchNow} cross={crossIfUnmatched} height="lg" className="mt-2" />
 
-        {/* Submit Button */}
-        <button
-          data-tour="submit-button"
-          type="submit"
-          disabled={isSubmitting || parsedAmount <= 0}
-          className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 disabled:bg-slate-200 text-white dark:text-slate-900 font-semibold text-xs rounded-md transition-colors"
-        >
-          {isSubmitting
-            ? 'Submitting on Stellar Testnet...'
-            : transferMode === 'direct_instant'
-              ? `Send $${parsedAmount.toFixed(2)} USDC Instantly`
-              : `Sign pre-authorization & place $${parsedAmount.toFixed(2)} USDC in matching queue`}
-        </button>
+            <div className="mt-5 grid grid-cols-2 gap-4">
+              <div>
+                <span className="flex items-center gap-2 font-[family-name:var(--font-label)] font-semibold text-[13px] tracking-wider uppercase text-emerald-700">
+                  <span className="w-2.5 h-2.5 rounded-[1px] bg-local" aria-hidden="true" />
+                  {isMatching ? 'Matches now' : 'Paid locally'}
+                </span>
+                <span className="block mt-1 text-[28px] leading-none font-semibold text-emerald-700">{usd(matchNow)}</span>
+                <span className="block mt-1 text-sm text-slate-600">paid locally</span>
+              </div>
+              <div>
+                <span className="flex items-center gap-2 font-[family-name:var(--font-label)] font-semibold text-[13px] tracking-wider uppercase text-sky-700">
+                  <span className="w-2.5 h-2.5 rounded-[1px] bg-cross" aria-hidden="true" />
+                  Crosses on Stellar
+                </span>
+                <span className="block mt-1 text-[28px] leading-none font-semibold text-sky-700">{usd(crossIfUnmatched)}</span>
+                <span className="block mt-1 text-sm text-slate-600">{isMatching ? 'if still unmatched' : 'right away, as USDC'}</span>
+              </div>
+            </div>
+            {isMatching && (
+              <p data-tour="remainder-policy" className="mt-3 text-sm text-slate-600">
+                {oppositeWaiting > 0
+                  ? `${usd(oppositeWaiting)} is waiting to go ${toCountry.name} → ${fromCountry.name} right now. `
+                  : `Nothing is waiting to go ${toCountry.name} → ${fromCountry.name} right now. `}
+                More can match before {departureTime}; whatever is left then goes to {recipientName.trim() || 'your recipient'} as USDC.
+              </p>
+            )}
+          </div>
+
+          <dl className="border-t border-slate-200 px-5 py-4 space-y-2 text-[15px]">
+            {isMatching && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-600">Local transfer for the matched part</dt>
+                <dd>{matchedFee === null ? 'n/a' : usd(matchedFee)}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-600">USDC conversion and cash-out (~{CROSS_PCT.toFixed(1)}%)</dt>
+              <dd>{usd(isMatching ? crossFee : (parsedAmount * CROSS_PCT) / 100)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-600">Stellar network fee</dt>
+              <dd>~0.00002 XLM</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-600">Tandem fee</dt>
+              <dd>$0.00</dd>
+            </div>
+            <div className="flex justify-between gap-4 pt-2 border-t border-slate-200 font-semibold">
+              <dt>{isMatching ? 'Estimated fees if sent now' : 'Estimated fees'}</dt>
+              <dd>{usd(isMatching ? totalFee : (parsedAmount * CROSS_PCT) / 100)}</dd>
+            </div>
+            {overseasCost !== null && (
+              <div className="flex justify-between gap-4 text-slate-600">
+                <dt>
+                  Same transfer with {feeRow.provider}
+                  <span className="sr-only"> (from the fee spreadsheet, {feeRow.id})</span>
+                </dt>
+                <dd>{usd(overseasCost)}</dd>
+              </div>
+            )}
+          </dl>
+
+          <div className="border-t border-slate-200 px-5 pt-6 pb-5">
+            {formError && (
+              <p role="alert" className="mb-4 text-sm text-rose-700 bg-rose-50 px-3 py-2.5 rounded-sm">
+                {formError}
+              </p>
+            )}
+            <button
+              data-tour="submit-button"
+              type="submit"
+              disabled={isSubmitting || parsedAmount <= 0}
+              className="w-full h-13 inline-flex items-center justify-center gap-2 rounded-sm bg-ink text-white text-[17px] font-semibold hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-600 transition-colors"
+            >
+              {isSubmitting ? 'Placing your transfer…' : `${isMatching ? 'Send' : 'Send now'} ${usd(parsedAmount)}`}
+              {!isSubmitting && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
+            </button>
+            <p className="mt-2.5 text-sm text-slate-600">
+              {isMatching
+                ? `Nothing leaves your account before a match or departure at ${departureTime}.`
+                : 'Converted to USDC and sent on the Stellar testnet straight away.'}
+            </p>
+          </div>
+        </aside>
       </form>
     </div>
   );

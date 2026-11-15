@@ -42,7 +42,8 @@ SAMPLE = {"bankName": "Demo bank", "transit": "12345", "institution": "003", "ro
 def bank_for(country):
     p = next(p for p in providers_for(country) if p["kind"] == "bank_account")
     account_no = "0123456789" if country == "Nigeria" else "1234567890"
-    details = {f["key"]: SAMPLE.get(f["key"], account_no if f["key"] == "accountNumber" else "Demo") for f in p["fields"]}
+    sample = {**SAMPLE, "iban": "AE070331234567890123456"} if country == "United Arab Emirates" else SAMPLE
+    details = {f["key"]: sample.get(f["key"], account_no if f["key"] == "accountNumber" else "Demo") for f in p["fields"]}
     return p["id"], {**details, "payerName": f"Test {country}"}
 
 

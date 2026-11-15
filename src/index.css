@@ -1,21 +1,257 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Tandem visual system: corridor timetable.
+ * Navy enamel shell, cool off-white ground, two line colours with fixed jobs:
+ *   local (green)  = matched, paid locally on both sides
+ *   cross (blue)   = the remainder, crossing the border as USDC on Stellar
+ *   amber          = window closing / testnet
+ *   red (rose)     = failure only
+ * The stock Tailwind scales the app already uses are remapped here, so every tab
+ * moves onto these tokens without touching its class names.
+ */
+@theme {
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-label: 'Barlow Semi Condensed', 'Barlow', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius: 3px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+
+  /* Neutrals tinted from the navy shell. 400 and up pass 4.5:1 on white. */
+  --color-slate-50: #f4f6f7;
+  --color-slate-100: #e8edef;
+  --color-slate-200: #d5dde1;
+  --color-slate-300: #b4c1c8;
+  --color-slate-400: #5f717d;
+  --color-slate-500: #4e5f6a;
+  --color-slate-600: #3c4c57;
+  --color-slate-700: #2b3a45;
+  --color-slate-800: #1b2b37;
+  --color-slate-900: #0f2233;
+  --color-slate-950: #08141f;
+
+  /* Local: matched, paid locally. */
+  --color-emerald-50: #e9f5ee;
+  --color-emerald-100: #d2ebdd;
+  --color-emerald-200: #a7d6bb;
+  --color-emerald-300: #74bc93;
+  --color-emerald-400: #3f9a68;
+  --color-emerald-500: #2f8a5b;
+  --color-emerald-600: #24744b;
+  --color-emerald-700: #1d5e3c;
+  --color-emerald-800: #174a30;
+  --color-emerald-900: #113825;
+  --color-emerald-950: #0a2217;
+
+  /* Cross: the remainder on Stellar. */
+  --color-sky-50: #ebf1f8;
+  --color-sky-100: #d5e2f0;
+  --color-sky-200: #acc5e2;
+  --color-sky-300: #7fa5d0;
+  --color-sky-400: #5285bb;
+  --color-sky-500: #3a6ea5;
+  --color-sky-600: #2f5b89;
+  --color-sky-700: #26496e;
+  --color-sky-800: #1e3a58;
+  --color-sky-900: #172c43;
+  --color-sky-950: #0e1c2c;
+
+  --color-amber-50: #fbf4e4;
+  --color-amber-100: #f6e6c2;
+  --color-amber-200: #edcd86;
+  --color-amber-300: #e2b04e;
+  --color-amber-400: #d69b27;
+  --color-amber-500: #c98a12;
+  --color-amber-600: #9c6a0b;
+  --color-amber-700: #7c540b;
+  --color-amber-800: #62420c;
+  --color-amber-900: #4a320c;
+  --color-amber-950: #2c1d06;
+
+  --color-rose-50: #fbeeec;
+  --color-rose-100: #f6d9d5;
+  --color-rose-200: #ecb2ab;
+  --color-rose-300: #df8579;
+  --color-rose-400: #cd5a4c;
+  --color-rose-500: #bf4538;
+  --color-rose-600: #a8392d;
+  --color-rose-700: #8a2e25;
+  --color-rose-800: #6e2620;
+  --color-rose-900: #521d18;
+  --color-rose-950: #2e0f0c;
+
+  --color-ink: #0f2233;
+  --color-ground: #f4f6f5;
+  --color-local: #2f8a5b;
+  --color-cross: #3a6ea5;
+  --color-signal: #c98a12;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @layer base {
+  html {
+    color-scheme: light;
+    scrollbar-color: var(--color-slate-300) transparent;
+  }
   body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: #0f172a;
-    background-color: #f8fafc;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    color: var(--color-ink);
+    background-color: var(--color-ground);
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    caret-color: var(--color-ink);
   }
-  .dark body {
-    color: #f1f5f9;
-    background-color: #090d16;
+  ::selection {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-cross);
+    outline-offset: 2px;
+  }
+  input,
+  select,
+  textarea {
+    accent-color: var(--color-ink);
+  }
+  a {
+    text-underline-offset: 3px;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-slate-300);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
+/* Amounts: tabular figures in the UI face (never monospace as decoration). */
 .font-mono-numbers {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase labels in the condensed face (field labels, column heads). */
+.label {
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-slate-500);
+}
+
+/* Work panel: white, squared, topped by the ink rule. */
+.panel {
+  background: #fff;
+  border-top: 3px solid var(--color-ink);
+  box-shadow: 0 1px 2px rgb(15 34 51 / 0.06);
+}
+
+/* Form controls in the timetable world: squared, 1px rule, ink focus. */
+.field {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--color-slate-300);
+  border-radius: 3px;
+  padding: 9px 12px;
+  font-size: 15px;
+  color: var(--color-ink);
+  transition: border-color 120ms;
+}
+.field::placeholder {
+  color: var(--color-slate-400);
+}
+.field:hover {
+  border-color: var(--color-slate-400);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 1px var(--color-ink);
+}
+
+/* Selects carry the drawn chevron (same stroke as the icon set), never the browser's. */
+select.field,
+select.chevron {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f2233' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 16px;
+}
+select.field {
+  background-position: right 10px center;
+  padding-right: 34px;
+}
+select.chevron {
+  background-position: right 0 center;
+  padding-right: 22px;
+  field-sizing: content; /* the chevron hugs the station name */
+}
+
+/* Disclosures use the drawn chevron, never the browser marker. */
+summary.disclose {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+summary.disclose::-webkit-details-marker {
+  display: none;
+}
+summary.disclose::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f2233' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 16px no-repeat;
+  transition: transform 150ms;
+}
+details[open] > summary.disclose::before {
+  transform: rotate(180deg);
+}
+
+/* Waiting (not yet matched, not yet sent): hatched, so it never reads as a colour state. */
+.hatch {
+  background-color: var(--color-slate-100);
+  background-image: repeating-linear-gradient(135deg, var(--color-slate-300) 0 2px, transparent 2px 6px);
+}
+
+/* The route strip segments: one authored motion, widths ease when the split changes. */
+.route-seg {
+  transition: flex-grow 700ms var(--ease-out-expo);
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-seg {
+    transition: none;
+  }
+}
+
+/* Inputs: no number spinners on amount fields. */
+input[type='number'].no-spin::-webkit-outer-spin-button,
+input[type='number'].no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'].no-spin {
+  -moz-appearance: textfield;
 }

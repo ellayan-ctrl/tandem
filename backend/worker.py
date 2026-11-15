@@ -12,8 +12,9 @@ log = logging.getLogger("twoway.worker")
 
 
 class ExpiryWorker:
-    def __init__(self, svc: OrderService, interval_s: float):
+    def __init__(self, svc: OrderService, interval_s: float, cashouts=None):
         self.svc = svc
+        self.cashouts = cashouts  # anchor cash-outs (SEP-24), advanced on the same serial loop
         self.interval_s = interval_s
         self._lock = asyncio.Lock()
         self._task = None
@@ -26,6 +27,8 @@ class ExpiryWorker:
                 await self._run(oid, None, "expired")
             for oid in self.svc.retryable_payout_ids():
                 await self._run(oid, "payout", "retry")
+            if self.cashouts:
+                await self.cashouts.process()
 
     async def _run(self, oid: int, action, label: str) -> None:
         try:

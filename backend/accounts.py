@@ -265,7 +265,8 @@ class AccountService:
             "institution": "003",
             "routing": "021000021",
             "accountNumber": "0123456789" if country == "Nigeria" else "1234567890",
-            "iban": "DE89370400440532013000",
+            # IBAN registry sample IBANs: the UAE format (AE + 21 digits) differs from the EU's.
+            "iban": "AE070331234567890123456" if country == "United Arab Emirates" else "DE89370400440532013000",
             "cbu": "0" * 22,
         }
         details = {f["key"]: sample.get(f["key"], "Demo") for f in provider["fields"]}

@@ -44,8 +44,12 @@ for (const { file, text } of SHEETS) {
       assert.equal(row.domestic.pct, parseFloat(pick(r, 'Domestic_Variable_Fee_Pct', 'Domestic_Transfer_Fee_Pct')));
       assert.equal(row.domestic.flat, parseFloat(r.Domestic_Flat_Fee_Origin_Curr));
       assert.equal(row.domestic.cap, parseFloat(r.Domestic_Fee_Cap_Origin_Curr));
-      const markup = r.Traditional_Bank_FX_Markup_Pct.split('-').map(parseFloat);
-      assert.deepEqual(row.bankMarkup, [Math.min(...markup), Math.max(...markup)]);
+      if (/^n\/?a$/i.test(r.Traditional_Bank_FX_Markup_Pct.trim())) {
+        assert.equal(row.bankMarkup, null); // no published bank markup for this corridor
+      } else {
+        const markup = r.Traditional_Bank_FX_Markup_Pct.split('-').map(parseFloat);
+        assert.deepEqual(row.bankMarkup, [Math.min(...markup), Math.max(...markup)]);
+      }
     });
   });
 
@@ -60,7 +64,8 @@ for (const { file, text } of SHEETS) {
         if (row.domestic.cap > 0) assert.ok(d.high <= row.domestic.cap + 1e-9, row.id);
         // Bank markup range scales with the amount.
         const b = bankMarkupFee(row, amount);
-        assert.ok(b[0] <= b[1] && Math.abs(b[1] - (amount * row.bankMarkup[1]) / 100) < 1e-9);
+        if (!row.bankMarkup) assert.equal(b, null);
+        else assert.ok(b[0] <= b[1] && Math.abs(b[1] - (amount * row.bankMarkup[1]) / 100) < 1e-9);
       }
       assert.equal(overseasFee(row, 0), 0);
       assert.deepEqual(domesticFee(row, 0), { low: 0, high: 0 });
